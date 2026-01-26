@@ -1,0 +1,84 @@
+@import "@fontsource/inter";
+@import "@fontsource/outfit";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-slate-900 text-white font-sans antialiased;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        @apply font-display;
+    }
+}
+
+/* LEAFLET DARK MODE OVERRIDES */
+.leaflet-container {
+    background: #0f172a !important; /* slate-900 */
+    font-family: 'Inter', sans-serif !important;
+}
+
+.leaflet-bar {
+    border: none !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.leaflet-bar a {
+    background-color: #1e293b !important; /* slate-800 */
+    color: #94a3b8 !important; /* slate-400 */
+    border-bottom: 1px solid #334155 !important; /* slate-700 */
+}
+
+.leaflet-bar a:hover {
+    background-color: #334155 !important; /* slate-700 */
+    color: #f8fafc !important; /* slate-50 */
+    border-bottom: 1px solid #334155 !important;
+}
+
+.leaflet-bar a:first-child {
+    border-top-left-radius: 8px !important;
+    border-top-right-radius: 8px !important;
+}
+
+.leaflet-bar a:last-child {
+    border-bottom-left-radius: 8px !important;
+    border-bottom-right-radius: 8px !important;
+    border-bottom: none !important;
+}
+
+/* Draw Toolbar specifics */
+.leaflet-draw-toolbar a {
+    background-image: none !important; /* we are hiding the default sprite to use solid colors, in a real app would replace icons */
+}
+/* Re-enable sprite but invert or style? actually standard sprite is dark-ish. Let's keep it simple and just container style. */
+/* Undoing the background-image:none for now so icons are visible, just dark bg */
+.leaflet-draw-toolbar a {
+    background-image: url('leaflet-draw/dist/images/spritesheet.png') !important; 
+    background-repeat: no-repeat;
+}
+
+
+.leaflet-draw-actions {
+    left: 36px !important;
+}
+
+.leaflet-draw-actions li:first-child a {
+    border-top-left-radius: 6px !important;
+    border-bottom-left-radius: 6px !important;
+}
+
+.leaflet-draw-actions li:last-child a {
+    border-top-right-radius: 6px !important;
+    border-bottom-right-radius: 6px !important;
+}
+
+.leaflet-draw-actions a {
+    background-color: #334155 !important;
+    color: #fff !important;
+}
