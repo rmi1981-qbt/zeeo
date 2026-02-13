@@ -18,26 +18,29 @@ interface DeliveryCardProps {
     primaryActionLabel?: string;
 }
 
-export const DeliveryCard: React.FC<DeliveryCardProps> = ({
+export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(({
     delivery,
     onAuthorize,
     onReject,
     showActions = true,
     compact = false,
     primaryActionLabel = "Autorizar"
-}) => {
+}, ref) => {
     const isArriving = delivery.status === 'arriving';
     const isPreAuth = delivery.status === 'pre_authorized';
 
     return (
         <motion.div
+            ref={ref}
             layout // Enable layout animation for FLIP effects
             initial={{ opacity: 0, scale: 0.9, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9 }}
             className={cn(
                 "relative overflow-hidden rounded-xl border backdrop-blur-md transition-all duration-300",
-                isArriving ? "bg-slate-800/80 border-primary-500/50 shadow-[0_0_20px_rgba(59,130,246,0.15)]" : "bg-slate-800/40 border-glass-100",
+                (isArriving || delivery.status === 'approaching') ? "bg-slate-800/80 border-primary-500/50 shadow-[0_0_20px_rgba(59,130,246,0.15)]" :
+                    delivery.status === 'at_gate' ? "bg-emerald-900/20 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]" :
+                        "bg-slate-800/40 border-glass-100",
                 compact ? "p-3" : "p-5"
             )}
         >
@@ -53,10 +56,21 @@ export const DeliveryCard: React.FC<DeliveryCardProps> = ({
                         <MapPin size={14} className="text-primary-400" />
                         <span className="text-lg font-bold text-white">{delivery.target_unit_label}</span>
                     </div>
-                    {isPreAuth && (
+                    {isPreAuth ? (
                         <div className="flex items-center space-x-1 mt-1 text-emerald-400 text-[10px] uppercase font-bold tracking-wide">
                             <CheckCircle2 size={10} />
                             <span>Pré-Autorizado</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center space-x-1 mt-1 text-slate-500 text-[10px] uppercase font-bold tracking-wide">
+                            <ShieldCheck size={10} />
+                            <span>Aguardando Liberação</span>
+                        </div>
+                    )}
+                    {delivery.status === 'approaching' && delivery.current_gate && (
+                        <div className="flex items-center space-x-1 mt-1 text-yellow-500 text-[10px] uppercase font-bold tracking-wide animate-pulse bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
+                            <MapPin size={10} />
+                            <span>Chegando na {delivery.current_gate.name}</span>
                         </div>
                     )}
                 </div>
@@ -127,4 +141,4 @@ export const DeliveryCard: React.FC<DeliveryCardProps> = ({
             )}
         </motion.div>
     );
-};
+});

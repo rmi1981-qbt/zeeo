@@ -1,0 +1,185 @@
+.condo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem 0;
+}
+
+.condo-card {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #E5E7EB;
+    border-top: 4px solid #1E3A8A;
+}
+
+.condo-card::before {
+    content: '🔒';
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 2rem;
+    opacity: 0.05;
+}
+
+.condo-card:hover {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-top-color: #10B981;
+}
+
+.card-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+
+.icon-circle {
+    width: 72px;
+    height: 72px;
+    background: #F0F9FF;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    border: 2px solid #1E3A8A;
+}
+
+.card-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-align: center;
+    margin: 0 0 1rem 0;
+    color: #111827;
+}
+
+.card-info {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    min-height: 80px;
+}
+
+.card-info p {
+    margin: 0.5rem 0;
+    font-size: 0.875rem;
+    color: #6B7280;
+}
+
+.card-info .location {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: #1E3A8A;
+}
+
+.card-info .neighborhood {
+    font-weight: 500;
+    color: #374151;
+}
+
+.card-info .address {
+    font-size: 0.8125rem;
+    color: #6B7280;
+}
+
+.card-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: auto;
+}
+
+.btn-card-edit,
+.btn-card-map,
+.btn-card-delete {
+    flex: 1;
+    padding: 0.75rem 0.75rem;
+    border: 1px solid;
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-card-edit {
+    background: white;
+    border-color: #1E3A8A;
+    color: #1E3A8A;
+}
+
+.btn-card-edit:hover {
+    background: #1E3A8A;
+    color: white;
+}
+
+.btn-card-map {
+    background: #1E3A8A;
+    border-color: #1E3A8A;
+    color: white;
+}
+
+.btn-card-map:hover {
+    background: #1E40AF;
+    border-color: #1E40AF;
+}
+
+.btn-card-delete {
+    background: white;
+    border-color: #DC2626;
+    color: #DC2626;
+    flex: 0.5;
+}
+
+.btn-card-delete:hover {
+    background: #DC2626;
+    color: white;
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6B7280;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.2;
+}
+
+.empty-state h3 {
+    font-size: 1.25rem;
+    color: #111827;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.empty-state p {
+    color: #6B7280;
+}
+
+@media (max-width: 768px) {
+    .condo-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .card-actions {
+        flex-wrap: wrap;
+    }
+
+    .btn-card-delete {
+        flex: 1;
+        width: 100%;
+    }
+}
+
+@media (min-width: 1200px) {
+    .condo-grid {
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    }
+}

@@ -1,22 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { useDeliveries } from '../hooks/useDeliveries';
 import { DeliveryCard } from '../components/DeliveryCard';
 import LiveMap from '../components/LiveMap';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
+import { condoService } from '../services/condoService';
 import {
-    PlusCircle,
-    MapPin,
-    Bell,
     History
 } from 'lucide-react';
 
 const Concierge: React.FC = () => {
-    // Condo ID would come from Auth Context
-    const { deliveries, addMockDelivery, updateStatus } = useDeliveries('condo_123');
+    const { selectedCondo } = useAuth();
+    const { deliveries, updateStatus } = useDeliveries(selectedCondo || 'mock');
+
+
+
+    const [providerFilter, setProviderFilter] = useState<string>('all');
+
+    const [gates, setGates] = useState<{ id: string; name: string; lat: number; lng: number; is_main: boolean }[]>([]);
+    const [condoCenter, setCondoCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
+
+    useEffect(() => {
+        if (selectedCondo) {
+            // Fetch Gates
+            fetch(`http://localhost:8000/condos/${selectedCondo}/gates`)
+                .then(res => res.json())
+                .then(data => {
+                    const uiGates = data.map((g: any) => ({
+                        id: g.id,
+                        name: g.name,
+                        lat: g.lat,
+                        lng: g.lng,
+                        is_main: g.is_main
+                    }));
+                    setGates(uiGates);
+                })
+                .catch(err => console.error('Failed to fetch gates', err));
+
+            // Fetch Condo Details for Center
+            condoService.getCondo(selectedCondo)
+                .then(data => {
+                    if (data.lat && data.lng) {
+                        setCondoCenter({ lat: data.lat, lng: data.lng });
+                    }
+                })
+                .catch(err => console.error('Failed to fetch condo details', err));
+        }
+    }, [selectedCondo]);
 
     // Filter Logic
-    // const arrivingDeliveries = deliveries.filter(d => ['arriving', 'pre_authorized'].includes(d.status || '')); // VISUALIZED ON MAP
-    const atGateDeliveries = deliveries.filter(d => d.status === 'at_gate');
+    const activeDeliveries = deliveries.filter(d =>
+        ['at_gate', 'approaching', 'pre_authorized'].includes(d.status || '') &&
+        (providerFilter === 'all' || d.provider === providerFilter)
+    );
     const recentHistory = deliveries.filter(d => ['completed', 'rejected'].includes(d.status || '')).slice(0, 5); // Last 5
 
     return (
@@ -25,48 +61,13 @@ const Concierge: React.FC = () => {
             {/* MAIN LAYOUT */}
             <div className="flex-1 flex flex-col h-full relative z-10">
 
-                {/* HEADER */}
-                <header className="h-20 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-50 gap-4">
-                    <div className="flex items-center space-x-4 min-w-[50px]">
-                        <div className="text-2xl font-display font-bold text-white shrink-0">
-                            Zeeo <span className="text-primary-500">.</span>
-                        </div>
-                        <div className="h-6 w-px bg-slate-700 hidden md:block" />
-                        <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-slate-800 rounded-full border border-slate-700 text-slate-400 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] lg:max-w-none">
-                            <MapPin size={14} className="shrink-0" />
-                            <span className="truncate">Condomínio Jardins • Portaria Principal</span>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3 md:space-x-6 shrink-0">
-                        {/* Demo Action */}
-                        <motion.button
-                            whileTap={{ scale: 0.95 }}
-                            onClick={addMockDelivery}
-                            className="flex items-center space-x-2 px-3 py-2 md:px-4 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg font-bold shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 transition-shadow whitespace-nowrap text-sm md:text-base"
-                        >
-                            <PlusCircle size={18} />
-                            <span className="hidden sm:inline">Simular iFood</span>
-                            <span className="sm:hidden">Simular</span>
-                        </motion.button>
-
-                        <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700 relative cursor-pointer shrink-0">
-                            <Bell size={16} className="text-slate-400" />
-                            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-slate-800" />
-                        </div>
-                        <div className="w-9 h-9 rounded-full bg-emerald-600 flex items-center justify-center text-xs font-bold ring-2 ring-slate-800 shrink-0">
-                            OP
-                        </div>
-                    </div>
-                </header>
-
                 {/* BOARD CONTENT */}
                 <main className="flex-1 p-6 overflow-hidden">
                     <div className="flex h-full gap-6 max-w-[1800px] mx-auto">
 
                         {/* COL 1: LIVE MAP (65%) */}
                         <div className="flex-[2] flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm relative overflow-hidden group">
-                            <LiveMap deliveries={deliveries} />
+                            <LiveMap deliveries={deliveries} gates={gates} center={condoCenter} />
                         </div>
 
                         {/* COL 2: PLANNER / OPERATIONAL (35%) */}
@@ -74,29 +75,53 @@ const Concierge: React.FC = () => {
 
                             {/* AT GATE (Active Action Required) */}
                             <div className="flex-1 flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden">
-                                <div className="p-4 border-b border-slate-800/50 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
-                                    <h2 className="text-lg font-bold text-emerald-100 flex items-center space-x-2">
-                                        <div className="w-2.5 h-2.5 bg-emerald-500 rounded-sm rotate-45" />
-                                        <span>Na Portaria / Liberado</span>
-                                    </h2>
-                                    <span className="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2 py-1 rounded-full">{atGateDeliveries.length}</span>
+                                <div className="p-4 border-b border-slate-800/50 flex flex-col gap-3 bg-slate-900/80 backdrop-blur-md">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
+                                            <div className="w-2.5 h-2.5 bg-yellow-400 rounded-sm rotate-45 animate-pulse" />
+                                            <span>Chegando / Portaria</span>
+                                        </h2>
+                                        <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-1 rounded-full">{activeDeliveries.length}</span>
+                                    </div>
+
+                                    {/* Filters */}
+                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                        {[
+                                            { id: 'all', label: 'Todos' },
+                                            { id: 'ifood', label: 'iFood' },
+                                            { id: 'mercadolivre', label: 'MercadoLivre' },
+                                            { id: 'uber', label: 'Uber' },
+                                            { id: 'rappi', label: 'Rappi' }
+                                        ].map(f => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => setProviderFilter(f.id)}
+                                                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${providerFilter === f.id
+                                                    ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20'
+                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                                    }`}
+                                            >
+                                                {f.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 <div className="p-4 overflow-y-auto space-y-4 flex-1 scrollbar-hide">
                                     <AnimatePresence mode="popLayout">
-                                        {atGateDeliveries.length === 0 && (
+                                        {activeDeliveries.length === 0 && (
                                             <div className="text-center py-10 text-slate-600">
-                                                <p className="text-sm">Ninguém aguardando entrada</p>
+                                                <p className="text-sm">Ninguém aguardando ou chegando</p>
                                             </div>
                                         )}
-                                        {atGateDeliveries.map(d => (
+                                        {activeDeliveries.map(d => (
                                             <DeliveryCard
                                                 key={d.id}
                                                 delivery={d}
                                                 // Show actions to allow entry
                                                 onAuthorize={(id) => updateStatus(id, 'inside')}
                                                 onReject={(id) => updateStatus(id, 'rejected')}
-                                                primaryActionLabel="Registrar Entrada"
+                                                primaryActionLabel={['at_gate', 'pre_authorized'].includes(d.status || '') ? "Liberar Entrada" : "Pré-Autorizar"}
                                             />
                                         ))}
                                     </AnimatePresence>

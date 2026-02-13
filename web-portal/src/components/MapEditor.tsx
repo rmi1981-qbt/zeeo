@@ -3,6 +3,7 @@ import { APIProvider, Map, useMap, useMapsLibrary } from '@vis.gl/react-google-m
 import { motion, AnimatePresence } from 'framer-motion';
 import { Info, Hexagon, Save, Loader2, MapPin, Eraser, PenTool, CheckCircle, Search } from 'lucide-react';
 import { condoService, Condo } from '../services/condoService';
+import { useToast } from '../contexts/ToastContext';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const MAP_ID = 'DEMO_MAP_ID';
@@ -199,6 +200,7 @@ const NeighborsMap = ({ neighbors }: { neighbors: Condo[] }) => {
 // --- Main Component ---
 
 const MapEditor: React.FC<MapEditorProps> = ({ onGeofenceChange }) => {
+    const { showToast } = useToast();
     const [mapCenter, setMapCenter] = useState({ lat: -23.5505, lng: -46.6333 });
     const [zoom, setZoom] = useState(15);
 
@@ -280,8 +282,14 @@ const MapEditor: React.FC<MapEditorProps> = ({ onGeofenceChange }) => {
     }, [onGeofenceChange]);
 
     const handleSave = async () => {
-        if (!formData.name) return alert('Dê um nome ao condomínio.');
-        if (!hasPolygon) return alert('Desenhe o perímetro.');
+        if (!formData.name) {
+            showToast({ type: 'warning', title: 'Nome obrigatório', message: 'Dê um nome ao condomínio.' });
+            return;
+        }
+        if (!hasPolygon) {
+            showToast({ type: 'warning', title: 'Perímetro incompleto', message: 'Desenhe o perímetro do condomínio.' });
+            return;
+        }
 
         setIsSaving(true);
         try {
@@ -289,7 +297,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onGeofenceChange }) => {
                 ...formData,
                 perimeter: currentPolygon
             });
-            alert('Condomínio salvo com sucesso!');
+            showToast({ type: 'success', title: 'Condomínio salvo!', message: 'O cadastro foi realizado com sucesso.' });
 
             setFormData({ name: '', zip_code: '', address: '', number: '', neighborhood: '', city: '', state: '' });
             setHasPolygon(false);
@@ -299,7 +307,7 @@ const MapEditor: React.FC<MapEditorProps> = ({ onGeofenceChange }) => {
             loadNeighbors();
         } catch (e) {
             console.error(e);
-            alert('Erro ao salvar.');
+            showToast({ type: 'error', title: 'Erro ao salvar', message: e instanceof Error ? e.message : 'Erro desconhecido' });
         } finally {
             setIsSaving(false);
         }

@@ -7,6 +7,7 @@ import uuid
 import traceback
 import binascii
 import json
+from datetime import datetime
 
 router = APIRouter(prefix="/condos", tags=["condos"])
 
@@ -77,6 +78,8 @@ def create_condo(condo: schemas.CondoCreate):
             "city": condo.city,
             "state": condo.state,
             "zip_code": condo.zip_code,
+            "lat": condo.lat,
+            "lng": condo.lng,
             "perimeter": f"SRID=4326;{wkt_str}" if wkt_str else None
         }
         
@@ -155,6 +158,8 @@ def update_condo(condo_id: str, condo: schemas.CondoCreate):
             "city": condo.city,
             "state": condo.state,
             "zip_code": condo.zip_code,
+            "lat": condo.lat,
+            "lng": condo.lng,
         }
 
         # Only update perimeter if new valid points are provided
@@ -214,4 +219,140 @@ async def delete_condo(condo_id: str):
     except Exception as e:
         print(f"❌ Error deleting condo: {str(e)}", flush=True)
         traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Gate Endpoints ---
+
+@router.post("/{condo_id}/gates", response_model=schemas.Gate)
+def create_gate(condo_id: str, gate: schemas.GateCreate):
+    print(f"🚪 POST /condos/{condo_id}/gates - Creating gate: {gate.name}", flush=True)
+    try:
+        # Create Geography Point
+        # PostGIS syntax: POINT(lng lat)
+        location_wkt = f"POINT({gate.lng} {gate.lat})"
+        
+        data = {
+            "condo_id": condo_id,
+            "name": gate.name,
+            "is_main": gate.is_main,
+            "location": f"SRID=4326;{location_wkt}"
+        }
+        
+        response = supabase.table('gates').insert(data).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Failed to create gate")
+            
+        result = response.data[0]
+        
+        # Parse location back to lat/lng for response
+        # Result location is likely WKB hex
+        if result.get('location'):
+            # Simple manual parsing or WKB handling if needed
+            # For now, we just pass back what we received in the request to ensure schema match
+            # or we ideally parse the returned WKB.
+            # Let's trust the request data for the response to avoid WKB complexity in this step
+            result['lat'] = gate.lat
+            result['lng'] = gate.lng
+            
+        return result
+        
+    except Exception as e:
+        print(f"❌ Error creating gate: {str(e)}", flush=True)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{condo_id}/gates", response_model=list[schemas.Gate])
+def list_gates(condo_id: str):
+    print(f"📋 GET /condos/{condo_id}/gates", flush=True)
+    try:
+        # Filter out logically deleted gates
+        response = supabase.table('gates').select('*').eq('condo_id', condo_id).is_('deleted_at', 'null').execute()
+        
+        gates = []
+        for g in response.data:
+            # Parse location
+            lat, lng = 0.0, 0.0
+            if g.get('location'):
+                try:
+                    # Try to parse WKB
+                    # If it satisfies the schema, we need lat/lng fields
+                    binary = binascii.unhexlify(g['location'])
+                    point = wkb.loads(binary)
+                    lng = point.x
+                    lat = point.y
+                except Exception:
+                    print(f"⚠️ Failed to parse gate location: {g['location']}")
+            
+            g['lat'] = lat
+            g['lng'] = lng
+            gates.append(g)
+            
+        return gates
+    except Exception as e:
+        print(f"❌ Error listing gates: {str(e)}", flush=True)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/{condo_id}/gates/{gate_id}", response_model=schemas.Gate)
+def update_gate(condo_id: str, gate_id: str, gate_update: schemas.GateUpdate):
+    print(f"🔄 PUT /condos/{condo_id}/gates/{gate_id}", flush=True)
+    try:
+        data = gate_update.dict(exclude_unset=True)
+        
+        # Handle location update if lat/lng provided
+        if gate_update.lat is not None and gate_update.lng is not None:
+            location_wkt = f"POINT({gate_update.lng} {gate_update.lat})"
+            data['location'] = f"SRID=4326;{location_wkt}"
+            
+        # Remove lat/lng from direct update since they map to location
+        if 'lat' in data: del data['lat']
+        if 'lng' in data: del data['lng']
+
+        if not data:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        response = supabase.table('gates').update(data).eq('id', gate_id).eq('condo_id', condo_id).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Gate not found")
+            
+        result = response.data[0]
+        
+        # Parse location back
+        lat, lng = 0.0, 0.0
+        if result.get('location'):
+            try:
+                binary = binascii.unhexlify(result['location'])
+                point = wkb.loads(binary)
+                lng = point.x
+                lat = point.y
+            except:
+                pass
+        
+        result['lat'] = lat
+        result['lng'] = lng
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating gate: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{condo_id}/gates/{gate_id}")
+def delete_gate(condo_id: str, gate_id: str):
+    print(f"🗑️ DELETE gate {gate_id} (Soft Delete)", flush=True)
+    try:
+        # Soft Delete: Set deleted_at to current timestamp
+        data = {"deleted_at": datetime.utcnow().isoformat()}
+        
+        response = supabase.table('gates').update(data).eq('id', gate_id).eq('condo_id', condo_id).execute()
+        
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Gate not found")
+            
+        return {"message": "Gate deleted"}
+    except Exception as e:
+        print(f"❌ Error deleting gate: {str(e)}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))

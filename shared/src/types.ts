@@ -44,7 +44,7 @@ export interface User {
 
 // --- Deliveries & Access ---
 
-export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'at_gate' | 'inside' | 'completed' | 'rejected';
+export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'inside' | 'completed' | 'rejected';
 export type DeliverySource = 'app_zeeo' | 'webhook_provider';
 export type ProviderName = 'ifood' | 'rappi' | 'uber' | 'mercadolivre' | 'other';
 
@@ -77,4 +77,8 @@ export interface Delivery {
   createdAt: string; // ISO Date
   updatedAt: string; // ISO Date
   arrivedAt?: string; // ISO Date
+  current_gate?: {
+    id: string;
+    name: string;
+  };
 }

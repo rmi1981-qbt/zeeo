@@ -1,0 +1,93 @@
+from pydantic import BaseModel
+from typing import List, Optional, Any
+from datetime import datetime
+
+class CondoBase(BaseModel):
+    name: str
+    address: Optional[str] = None
+    number: Optional[str] = None
+    neighborhood: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    # Perimeter will be accepted as a list of points (lat, lng) from frontend 
+    # and converted to WKT in the backend logic, or passed as raw depending on strategy.
+    # Let's align with current frontend which sends { perimeter: { lat: number, lng: number }[] }
+    perimeter_points: Optional[List[Any]] = None 
+
+class CondoCreate(CondoBase):
+    pass
+
+class Condo(CondoBase):
+    id: str
+    created_at: datetime
+    # Return GeoJSON object (dict)
+    perimeter: Optional[Any] = None
+
+    class Config:
+        from_attributes = True
+
+# --- Delivery Schemas ---
+
+class DeliveryBase(BaseModel):
+    condo_id: str
+    unit: Optional[str] = None
+    status: Optional[str] = 'created' # created, driver_assigned, approaching, at_gate, inside, completed, rejected, pre_authorized
+    platform: Optional[str] = 'mock' # ifood, ubereats, mercadolivre, rappi, other, mock
+    driver_name: Optional[str] = None
+    driver_photo: Optional[str] = None
+    driver_plate: Optional[str] = None
+    driver_lat: Optional[float] = None
+    driver_lng: Optional[float] = None
+    eta: Optional[datetime] = None
+
+class DeliveryCreate(DeliveryBase):
+    pass
+
+class DeliveryUpdate(BaseModel):
+    status: Optional[str] = None
+    driver_lat: Optional[float] = None
+    driver_lng: Optional[float] = None
+    eta: Optional[datetime] = None
+
+class GateInfo(BaseModel):
+    id: str
+    name: str
+
+class Delivery(DeliveryBase):
+    id: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    current_gate_id: Optional[str] = None
+    current_gate: Optional[GateInfo] = None
+
+    class Config:
+        from_attributes = True
+
+# --- Gate Schemas ---
+
+class GateBase(BaseModel):
+    name: str
+    is_main: Optional[bool] = False
+    lat: float
+    lng: float
+
+class GateCreate(GateBase):
+    pass
+
+class GateUpdate(BaseModel):
+    name: Optional[str] = None
+    is_main: Optional[bool] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+
+class Gate(GateBase):
+    id: str
+    condo_id: str
+    created_at: datetime
+    deleted_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { APIProvider, Map, AdvancedMarker, InfoWindow, useAdvancedMarkerRef } from '@vis.gl/react-google-maps';
+import React, { useState, useEffect } from 'react';
+import { APIProvider, Map, AdvancedMarker, InfoWindow, useAdvancedMarkerRef, useMap } from '@vis.gl/react-google-maps';
 import { Delivery } from '@zeeo/shared';
 import { motion } from 'framer-motion';
-import { Bike, Truck, Car, MapPin } from 'lucide-react';
+import { Bike, Truck, Car, MapPin, DoorOpen } from 'lucide-react';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const MAP_ID = 'DEMO_MAP_ID';
@@ -16,8 +16,17 @@ const getProviderIcon = (provider: string = '') => {
     }
 };
 
+export interface Gate {
+    id: string;
+    name: string;
+    lat: number;
+    lng: number;
+    is_main: boolean;
+}
+
 interface LiveMapProps {
     deliveries: Delivery[];
+    gates?: Gate[];
     center?: { lat: number, lng: number };
 }
 
@@ -64,10 +73,23 @@ const DeliveryMarker = ({ delivery }: { delivery: Delivery }) => {
     );
 };
 
-const LiveMap: React.FC<LiveMapProps> = ({ deliveries, center = { lat: -23.5505, lng: -46.6333 } }) => {
+// Inner component to handle map updates
+const MapController = ({ center }: { center: { lat: number, lng: number } }) => {
+    const map = useMap();
+
+    useEffect(() => {
+        if (map && center) {
+            map.panTo(center);
+        }
+    }, [map, center]);
+
+    return null;
+};
+
+const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 } }) => {
     // Filter deliveries to show on map (Arriving and Inside)
     const mapDeliveries = deliveries.filter(d =>
-        ['arriving', 'pre_authorized', 'inside'].includes(d.status) && d.location
+        ['arriving', 'approaching', 'pre_authorized', 'inside'].includes(d.status) && d.location
     );
 
     if (!GOOGLE_MAPS_API_KEY) {
@@ -96,14 +118,31 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, center = { lat: -23.5505,
                     gestureHandling={'greedy'}
                     className="w-full h-full"
                     style={{ background: '#0f172a' }} // prevent white flash
-                // Custom dark style for generic Map ID (if DEMO_MAP_ID doesn't exist, this might not fully apply without a cloud style)
                 >
-                    {/* Condo Center Marker */}
-                    <AdvancedMarker position={center} title="Portaria Principal">
-                        <div className="p-2 rounded-full bg-emerald-500 border-2 border-white shadow-lg shadow-emerald-500/50">
-                            <MapPin size={20} className="text-white" />
-                        </div>
+                    <MapController center={center} />
+
+                    {/* Condo Center Marker - Kept as fallback/general location */}
+                    <AdvancedMarker position={center} title="Localização do Condomínio">
+                        <div className="w-3 h-3 rounded-full bg-slate-400/50 border border-slate-300"></div>
                     </AdvancedMarker>
+
+                    {/* Gates */}
+                    {gates.map(gate => (
+                        <AdvancedMarker
+                            key={gate.id}
+                            position={{ lat: gate.lat, lng: gate.lng }}
+                            title={gate.name}
+                        >
+                            <div className={`p-1.5 rounded-lg border-2 border-white shadow-lg flex items-center justify-center group relative
+                                ${gate.is_main ? 'bg-emerald-600 shadow-emerald-500/50' : 'bg-slate-700 shadow-slate-900/50'}`}
+                            >
+                                <DoorOpen size={16} className="text-white" />
+                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+                                    {gate.name}
+                                </div>
+                            </div>
+                        </AdvancedMarker>
+                    ))}
 
                     {mapDeliveries.map(d => (
                         <DeliveryMarker key={d.id} delivery={d} />

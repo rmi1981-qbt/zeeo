@@ -1,0 +1,27 @@
+{
+    "name": "Teste Condomínio",
+    "address": "Rua Teste",
+    "number": "123",
+    "neighborhood": "Bairro Teste",
+    "city": "São Paulo",
+    "state": "SP",
+    "zip_code": "01234-567",
+    "perimeter_points": [
+        {
+            "lat": -23.55,
+            "lng": -46.63
+        },
+        {
+            "lat": -23.56,
+            "lng": -46.63
+        },
+        {
+            "lat": -23.56,
+            "lng": -46.64
+        },
+        {
+            "lat": -23.55,
+            "lng": -46.64
+        }
+    ]
+}

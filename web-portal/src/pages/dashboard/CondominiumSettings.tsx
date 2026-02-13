@@ -1,32 +1,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { condoService, type Condo } from '../../services/condoService';
+import { condoService, type Condo, type Gate } from '../../services/condoService';
 import { cepService } from '../../services/cepService';
-import { ArrowLeft, Save, Loader2, Search } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { ArrowLeft, Save, Loader2, Search, DoorOpen, Trash2 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import PerimeterMap from '../../components/PerimeterMap';
 
-type CondoDetails = {
-    id: string;
-    name: string;
-    address: string;
-    number?: string;
-    neighborhood: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    perimeter: any;
-};
+// CondoDetails type removed, using Condo from service
 
 export default function CondominiumSettings() {
     const [searchParams] = useSearchParams();
     const condoId = searchParams.get('id');
-    const { profile, memberships } = useAuth();
     const { showToast } = useToast();
     const navigate = useNavigate();
 
-    const [condo, setCondo] = useState<CondoDetails | null>(null);
+    const [condo, setCondo] = useState<Condo | null>(null);
+    const [gates, setGates] = useState<Gate[]>([]);
     const [perimeterPath, setPerimeterPath] = useState<{ lat: number; lng: number }[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -59,6 +48,20 @@ export default function CondominiumSettings() {
         return [];
     }, []);
 
+    // Fetch Gates
+    const fetchGates = useCallback(async () => {
+        if (!condoId) return;
+        try {
+            const gates = await condoService.getGates(condoId);
+            // setGates expects Gate[], which we return. 
+            // Note: DB returns Gate with lat/lng.
+            setGates(gates);
+        } catch (error) {
+            console.error('Error fetching gates:', error);
+        }
+    }, [condoId]);
+
+
     useEffect(() => {
         async function fetchCondo() {
             if (!condoId) {
@@ -67,20 +70,18 @@ export default function CondominiumSettings() {
             }
 
             try {
-                // Fetch via backend API (respects same data flow)
-                const response = await fetch(`http://localhost:8000/condos/${condoId}`);
-                if (!response.ok) {
-                    throw new Error('Condomínio não encontrado');
-                }
-                const data = await response.json();
+                // Fetch via backend API
+                const data = await condoService.getCondo(condoId);
                 setCondo(data);
 
                 // Parse perimeter for the map
                 const coords = parsePerimeter(data.perimeter);
                 setPerimeterPath(coords);
 
-                // Calculate map center from perimeter or geocode address
-                if (coords.length > 0) {
+                // Calculate map center
+                if (data.lat && data.lng) {
+                    setMapCenter({ lat: data.lat, lng: data.lng });
+                } else if (coords.length > 0) {
                     const avgLat = coords.reduce((sum, p) => sum + p.lat, 0) / coords.length;
                     const avgLng = coords.reduce((sum, p) => sum + p.lng, 0) / coords.length;
                     setMapCenter({ lat: avgLat, lng: avgLng });
@@ -98,6 +99,10 @@ export default function CondominiumSettings() {
                         console.warn('Geocoding failed:', e);
                     }
                 }
+
+                // Fetch Gates
+                await fetchGates();
+
             } catch (error) {
                 console.error('Error fetching condo:', error);
                 showToast({ type: 'error', title: 'Erro', message: 'Não foi possível carregar o condomínio' });
@@ -107,7 +112,7 @@ export default function CondominiumSettings() {
         }
 
         fetchCondo();
-    }, [condoId, parsePerimeter, showToast]);
+    }, [condoId, parsePerimeter, fetchGates, showToast]);
 
     // CEP Lookup
     const handleCEPLookup = async (cep: string) => {
@@ -164,12 +169,59 @@ export default function CondominiumSettings() {
         }
     };
 
+    // Gate Handlers - Immediate Persistence
+    const handleGateAdd = async (gateData: any) => {
+        if (!condo) return;
+        try {
+            const newGate = await condoService.createGate(condo.id, gateData);
+            setGates(prev => [...prev, newGate]);
+            showToast({ type: 'success', title: 'Portaria Criada', message: newGate.name });
+        } catch (e) {
+            console.error(e);
+            showToast({ type: 'error', title: 'Erro', message: 'Falha ao criar portaria' });
+        }
+    };
+
+    const handleGateUpdate = async (gate: any) => {
+        if (!condo) return;
+        try {
+            setGates(prev => prev.map(g => g.id === gate.id ? gate : g)); // Optimistic UI
+
+            await condoService.updateGate(condo.id, gate.id, {
+                name: gate.name,
+                lat: gate.lat,
+                lng: gate.lng,
+                is_main: gate.is_main
+            });
+        } catch (e) {
+            console.error(e);
+            showToast({ type: 'error', title: 'Erro', message: 'Falha ao atualizar portaria' });
+            fetchGates(); // Revert on error
+        }
+    };
+
+    const handleGateDelete = async (gateId: string) => {
+        if (!condo) return;
+        if (!confirm('Tem certeza que deseja excluir esta portaria?')) return;
+
+        try {
+            setGates(prev => prev.filter(g => g.id !== gateId)); // Optimistic UI
+            await condoService.deleteGate(condo.id, gateId);
+            showToast({ type: 'success', title: 'Portaria Removida', message: 'Portaria excluída com sucesso' });
+        } catch (e) {
+            console.error(e);
+            showToast({ type: 'error', title: 'Erro', message: 'Falha ao excluir portaria' });
+            fetchGates();
+        }
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!condo) return;
         setSaving(true);
 
         try {
+            // Only Save Condo Details & Perimeter (Gates are auto-saved)
             await condoService.updateCondo(condo.id, {
                 name: condo.name,
                 address: condo.address,
@@ -178,10 +230,13 @@ export default function CondominiumSettings() {
                 city: condo.city || undefined,
                 state: condo.state || undefined,
                 zip_code: condo.zip_code || undefined,
+                lat: mapCenter?.lat,
+                lng: mapCenter?.lng,
                 perimeter: perimeterPath
             });
 
-            showToast({ type: 'success', title: 'Alterações salvas!', message: 'As configurações foram atualizadas com sucesso.' });
+            showToast({ type: 'success', title: 'Alterações salvas!', message: 'Dados do condomínio atualizados.' });
+
         } catch (error) {
             console.error(error);
             showToast({ type: 'error', title: 'Erro ao salvar', message: error instanceof Error ? error.message : 'Erro desconhecido' });
@@ -321,16 +376,88 @@ export default function CondominiumSettings() {
 
                         {/* Mapa de Perímetro */}
                         <div className="pt-6 border-t border-slate-800">
-                            <h3 className="text-lg font-semibold text-white mb-4">Perímetro de Segurança</h3>
+                            <h3 className="text-lg font-semibold text-white mb-4">Perímetro e Portarias</h3>
                             <p className="text-sm text-slate-400 mb-4">
-                                Use as ferramentas de desenho para definir ou alterar o perímetro do condomínio.
+                                Use as ferramentas de desenho para definir o perímetro. Clique no botão "+ Portaria" para adicionar uma portaria no mapa.
                             </p>
                             <div className="h-[60vh] min-h-[500px]">
                                 <PerimeterMap
                                     initialCenter={mapCenter}
                                     initialPolygon={perimeterPath}
+                                    initialGates={gates}
                                     onPolygonChange={setPerimeterPath}
+                                    onGateAdd={handleGateAdd}
+                                    onGateUpdate={handleGateUpdate}
+                                    onGateDelete={handleGateDelete}
                                 />
+                            </div>
+
+                            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden mt-4">
+                                <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
+                                    <h3 className="font-semibold text-slate-300">Portarias Cadastradas ({gates.length})</h3>
+                                    <span className="text-xs text-slate-500">Arraste no mapa para ajustar a posição</span>
+                                </div>
+                                {gates.length === 0 ? (
+                                    <div className="p-8 text-center text-slate-500">
+                                        <p>Nenhuma portaria cadastrada.</p>
+                                        <p className="text-sm mt-1">Clique no botão <span className="text-blue-400 font-mono text-xs bg-slate-800 px-1 py-0.5 rounded">+ Portaria</span> no mapa para adicionar.</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-slate-800">
+                                        {gates.map((gate) => (
+                                            <div key={gate.id} className="p-4 flex items-center justify-between hover:bg-slate-800/20 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-lg ${gate.is_main ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-400'}`}>
+                                                        <DoorOpen size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-medium text-white flex items-center gap-2">
+                                                            {gate.name}
+                                                            {gate.is_main && (
+                                                                <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase font-bold tracking-wider">Principal</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-slate-500 font-mono mt-0.5">
+                                                            Lat: {gate.lat.toFixed(5)}, Lng: {gate.lng.toFixed(5)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    {!gate.is_main && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                // Unset previous main if any (optional, backend usually handles 1 main?)
+                                                                // For now just set this to main.
+                                                                handleGateUpdate({ ...gate, is_main: true });
+                                                                // Ideally we should unset others.
+                                                                // Let's iterate:
+                                                                gates.forEach(g => {
+                                                                    if (g.is_main && g.id !== gate.id) {
+                                                                        handleGateUpdate({ ...g, is_main: false });
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition-colors"
+                                                        >
+                                                            Definir como Principal
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleGateDelete(gate.id)}
+                                                        className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                                                        title="Remover Portaria"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
