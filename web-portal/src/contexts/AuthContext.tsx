@@ -80,7 +80,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (membersResponse.error) console.error('Error fetching memberships:', membersResponse.error);
 
       setProfile(profileResponse.data);
-      setMemberships(membersResponse.data || []);
+      const members = membersResponse.data || [];
+      setMemberships(members);
+
+      // Auto-select first condo if none selected
+      const currentCondo = localStorage.getItem('saas_selected_condo');
+      if (!currentCondo && members.length > 0) {
+        const firstCondoId = members[0].condominium_id;
+        setSelectedCondo(firstCondoId);
+        localStorage.setItem('saas_selected_condo', firstCondoId);
+      }
     } catch (error) {
       console.error('Error in fetchProfileAndMemberships:', error);
     } finally {

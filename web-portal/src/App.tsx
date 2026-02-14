@@ -6,6 +6,7 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import CondoSelection from './pages/dashboard/CondoSelection';
 import CondominiumSettings from './pages/dashboard/CondominiumSettings';
+import DashboardHome from './pages/dashboard/DashboardHome';
 import Concierge from './pages/Concierge';
 import CondoRegistrationWizard from './components/CondoRegistrationWizard';
 import { BugMonitor } from './components/BugMonitor';
@@ -15,33 +16,35 @@ import ResidentDashboard from './pages/resident/ResidentDashboard';
 
 // Role Based Redirect Component
 function RoleBasedRedirect() {
-    const { profile, memberships, selectedCondo } = useAuth();
+    const { loading, profile, memberships, selectedCondo } = useAuth();
 
-    if (!profile) return <div>Loading...</div>;
+    // Wait until auth data is fully loaded
+    if (loading || !profile) return <div>Loading...</div>;
 
-    // 1. Platform Admin -> Condo Selection or Settings
-    if (profile.is_platform_admin) {
-        return <Navigate to="/condo-selection" replace />;
+    // 1. Check Membership for Selected Condo
+    const membership = selectedCondo
+        ? memberships.find(m => m.condominium_id === selectedCondo)
+        : null;
+
+    // 2. If we have a valid membership, redirect based on Role
+    if (membership) {
+        switch (membership.role) {
+            case 'admin':
+                return <Navigate to="/dashboard" replace />;
+            case 'concierge':
+                return <Navigate to="/concierge" replace />;
+            case 'resident':
+                return <Navigate to="/resident" replace />;
+        }
     }
 
-    // 2. Check Membership for Selected Condo
-    const membership = memberships.find(m => m.condominium_id === selectedCondo);
-
-    if (!membership) {
-        return <Navigate to="/condo-selection" replace />;
+    // 3. Platform admin with a selected condo → Dashboard (even without explicit membership)
+    if (profile.is_platform_admin && selectedCondo) {
+        return <Navigate to="/dashboard" replace />;
     }
 
-    // 3. Redirect based on Role
-    switch (membership.role) {
-        case 'admin':
-            return <Navigate to="/dashboard" replace />;
-        case 'concierge':
-            return <Navigate to="/concierge" replace />;
-        case 'resident':
-            return <Navigate to="/resident" replace />;
-        default:
-            return <Navigate to="/login" replace />;
-    }
+    // 4. No condo selected or no membership → Condo Selection
+    return <Navigate to="/condo-selection" replace />;
 }
 
 function AdminMap() {
@@ -65,7 +68,7 @@ function App() {
                         <Route element={<ProtectedRoute />}>
                             <Route element={<MainLayout />}>
                                 <Route path="/" element={<RoleBasedRedirect />} />
-                                <Route path="/dashboard" element={<CondominiumSettings />} />
+                                <Route path="/dashboard" element={<DashboardHome />} />
                                 <Route path="/concierge" element={<Concierge />} />
                                 <Route path="/resident" element={<ResidentDashboard />} />
 

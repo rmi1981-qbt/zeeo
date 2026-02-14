@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Delivery, DeliveryStatus } from '@zeeo/shared';
-import { deliveryService, ApiDelivery } from '../services/deliveryService';
+import { deliveryService, ApiDelivery, StatusUpdatePayload } from '../services/deliveryService';
 import { supabase } from '../lib/supabase';
 
 // --- Utils ---
@@ -33,7 +33,12 @@ const mapApiToUi = (d: ApiDelivery): Delivery => ({
     location: (d.driver_lat && d.driver_lng) ? { lat: d.driver_lat, lng: d.driver_lng } : undefined,
     createdAt: d.created_at,
     updatedAt: d.updated_at || d.created_at,
-    current_gate: d.current_gate
+    current_gate: d.current_gate,
+    authorized_by: d.authorized_by,
+    authorized_method: d.authorized_method as any,
+    authorized_at: d.authorized_at,
+    entered_at: d.entered_at,
+    exited_at: d.exited_at,
 });
 
 export function useDeliveries(condoId: string) {
@@ -149,23 +154,21 @@ export function useDeliveries(condoId: string) {
         }
     }, [condoId]);
 
-    const updateStatus = useCallback(async (id: string, newStatus: DeliveryStatus) => {
+    const updateStatus = useCallback(async (id: string, payload: StatusUpdatePayload) => {
         try {
             // Optimistic Update
-            setDeliveries(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
+            setDeliveries(prev => prev.map(d => d.id === id ? { ...d, status: payload.status as DeliveryStatus } : d));
 
-            let lat, lng;
-            if (newStatus === 'inside') {
+            if (payload.status === 'inside' && !payload.driver_lat) {
                 const loc = getRandomLocation('inside');
-                lat = loc.lat;
-                lng = loc.lng;
+                payload.driver_lat = loc.lat;
+                payload.driver_lng = loc.lng;
             }
 
-            await deliveryService.updateStatus(id, newStatus, lat, lng);
+            await deliveryService.updateStatus(id, payload);
             // No need to fetchDeliveries(), Realtime will catch it
         } catch (e) {
             console.error("Failed to update status", e);
-            // Revert optimistic update?
             fetchDeliveries();
         }
     }, [fetchDeliveries]);

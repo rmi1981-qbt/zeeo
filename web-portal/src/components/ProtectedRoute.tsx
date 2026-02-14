@@ -17,7 +17,7 @@ export default function ProtectedRoute() {
         return <Navigate to="/login" replace />;
     }
 
-    if (!selectedCondo && location.pathname !== '/condo-selection') {
+    if (!selectedCondo && location.pathname !== '/condo-selection' && location.pathname !== '/') {
         return <Navigate to="/condo-selection" replace />;
     }
 

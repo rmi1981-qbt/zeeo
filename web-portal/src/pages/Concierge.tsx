@@ -119,8 +119,8 @@ const Concierge: React.FC = () => {
                                                 key={d.id}
                                                 delivery={d}
                                                 // Show actions to allow entry
-                                                onAuthorize={(id) => updateStatus(id, 'inside')}
-                                                onReject={(id) => updateStatus(id, 'rejected')}
+                                                onAuthorize={(id) => updateStatus(id, { status: 'inside', authorization_method: 'manual', actor_role: 'concierge' })}
+                                                onReject={(id) => updateStatus(id, { status: 'rejected', actor_role: 'concierge' })}
                                                 primaryActionLabel={['at_gate', 'pre_authorized'].includes(d.status || '') ? "Liberar Entrada" : "Pré-Autorizar"}
                                             />
                                         ))}

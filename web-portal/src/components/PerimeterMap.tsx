@@ -16,9 +16,10 @@ interface PerimeterMapProps {
     onGateAdd?: (gate: Omit<Gate, 'id' | 'created_at' | 'condo_id'>) => Promise<void>;
     onGateUpdate?: (gate: Gate) => Promise<void>;
     onGateDelete?: (gateId: string) => Promise<void>;
+    readOnly?: boolean;
 }
 
-export default function PerimeterMap({ initialCenter, initialPolygon, initialGates = [], onPolygonChange, onGateAdd, onGateUpdate, onGateDelete }: PerimeterMapProps) {
+export default function PerimeterMap({ initialCenter, initialPolygon, initialGates = [], onPolygonChange, onGateAdd, onGateUpdate, onGateDelete, readOnly = false }: PerimeterMapProps) {
     return (
         <div className="w-full h-full relative rounded-xl overflow-hidden border border-slate-700">
             <APIProvider apiKey={GOOGLE_MAPS_API_KEY} libraries={['geometry', 'places', 'marker']}>
@@ -30,13 +31,14 @@ export default function PerimeterMap({ initialCenter, initialPolygon, initialGat
                     onGateAdd={onGateAdd}
                     onGateUpdate={onGateUpdate}
                     onGateDelete={onGateDelete}
+                    readOnly={readOnly}
                 />
             </APIProvider>
         </div>
     );
 }
 
-function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonChange, onGateAdd, onGateUpdate }: PerimeterMapProps) {
+function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonChange, onGateAdd, onGateUpdate, readOnly = false }: PerimeterMapProps) {
     const map = useMap();
     const markerLib = useMapsLibrary('marker');
 
@@ -90,9 +92,9 @@ function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonCha
             paths: initialPolygon,
             strokeColor: '#3b82f6',
             fillColor: '#3b82f6',
-            fillOpacity: 0.3,
-            editable: true,
-            draggable: true,
+            fillOpacity: readOnly ? 0 : 0.3,
+            editable: !readOnly,
+            draggable: !readOnly,
             map: map,
             clickable: false
         });
@@ -122,7 +124,7 @@ function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonCha
         google.maps.event.addListener(poly, 'dragend', update);
 
         // Ensure editable state sticks
-        poly.setEditable(true);
+        if (!readOnly) poly.setEditable(true);
     };
 
 
@@ -321,7 +323,7 @@ function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonCha
                     <AdvancedMarker
                         key={gate.id}
                         position={{ lat: gate.lat, lng: gate.lng }}
-                        draggable={true}
+                        draggable={!readOnly}
                         onDragEnd={(e) => handleGateDragEnd(e, index)}
                         title={gate.name}
                     >
@@ -340,84 +342,90 @@ function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonCha
             </Map>
 
             {/* Search Control */}
-            <MapControl position={ControlPosition.TOP_LEFT}>
-                <div className="mt-4 ml-4 w-96">
-                    <PlaceSearchBox onPlaceSelect={handlePlaceSelect} />
-                </div>
-            </MapControl>
+            {!readOnly && (
+                <MapControl position={ControlPosition.TOP_LEFT}>
+                    <div className="mt-4 ml-4 w-96">
+                        <PlaceSearchBox onPlaceSelect={handlePlaceSelect} />
+                    </div>
+                </MapControl>
+            )}
 
             {/* Toolbar */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl flex gap-1 z-50">
-                {!isDrawing ? (
-                    <>
-                        <button
-                            onClick={() => { setAddingGate(!addingGate); setIsDrawing(false); }}
-                            className={`p-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-lg
-                                ${addingGate ? 'bg-amber-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-blue-400'}`}
-                            title="Adicionar Portaria"
-                        >
-                            <Plus size={16} />
-                            <span>Portaria</span>
-                        </button>
-                        <div className="w-px h-6 bg-slate-700 mx-1"></div>
+            {!readOnly && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl flex gap-1 z-50">
+                    {!isDrawing ? (
+                        <>
+                            <button
+                                onClick={() => { setAddingGate(!addingGate); setIsDrawing(false); }}
+                                className={`p-2 rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-lg
+                                    ${addingGate ? 'bg-amber-500 text-white' : 'bg-slate-800 hover:bg-slate-700 text-blue-400'}`}
+                                title="Adicionar Portaria"
+                            >
+                                <Plus size={16} />
+                                <span>Portaria</span>
+                            </button>
+                            <div className="w-px h-6 bg-slate-700 mx-1"></div>
 
-                        <button
-                            onClick={startDrawing}
-                            className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-lg"
-                        >
-                            <PenTool size={16} />
-                            <span>{finalPolygon ? 'Redesenhar' : 'Desenhar'}</span>
-                        </button>
-                        <div className="w-px h-6 bg-slate-700 mx-1"></div>
-                        <button
-                            onClick={clearAll}
-                            disabled={!finalPolygon}
-                            className="p-2 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-slate-400"
-                            title="Limpar"
-                        >
-                            <Eraser size={16} />
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <button
-                            onClick={finishDrawing}
-                            disabled={points.length < 3}
-                            className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-lg"
-                        >
-                            <CheckCircle size={16} />
-                            <span>Concluir</span>
-                        </button>
-                        <div className="w-px h-6 bg-slate-700 mx-1"></div>
-                        <button
-                            onClick={undoLastPoint}
-                            disabled={points.length === 0}
-                            className="p-2 hover:bg-slate-700 disabled:opacity-30 rounded-lg text-slate-300"
-                            title="Desfazer ponto"
-                        >
-                            <Undo size={16} />
-                        </button>
-                        <button
-                            onClick={cancelDrawing}
-                            className="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-400"
-                            title="Cancelar"
-                        >
-                            <Eraser size={16} />
-                        </button>
-                    </>
-                )}
-            </div>
+                            <button
+                                onClick={startDrawing}
+                                className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-lg"
+                            >
+                                <PenTool size={16} />
+                                <span>{finalPolygon ? 'Redesenhar' : 'Desenhar'}</span>
+                            </button>
+                            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+                            <button
+                                onClick={clearAll}
+                                disabled={!finalPolygon}
+                                className="p-2 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-slate-400"
+                                title="Limpar"
+                            >
+                                <Eraser size={16} />
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                onClick={finishDrawing}
+                                disabled={points.length < 3}
+                                className="p-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg flex items-center gap-2 text-sm font-bold transition-colors shadow-lg"
+                            >
+                                <CheckCircle size={16} />
+                                <span>Concluir</span>
+                            </button>
+                            <div className="w-px h-6 bg-slate-700 mx-1"></div>
+                            <button
+                                onClick={undoLastPoint}
+                                disabled={points.length === 0}
+                                className="p-2 hover:bg-slate-700 disabled:opacity-30 rounded-lg text-slate-300"
+                                title="Desfazer ponto"
+                            >
+                                <Undo size={16} />
+                            </button>
+                            <button
+                                onClick={cancelDrawing}
+                                className="p-2 hover:bg-red-500/20 hover:text-red-400 rounded-lg text-slate-400"
+                                title="Cancelar"
+                            >
+                                <Eraser size={16} />
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Status */}
-            <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-3 text-xs text-slate-400 flex items-center gap-2 z-10">
-                <Info size={14} />
-                {isDrawing
-                    ? <span>Clique no mapa para adicionar pontos. Clique no primeiro ponto ou "Concluir" para fechar.</span>
-                    : addingGate
-                        ? <span className="text-amber-400">Clique na localização da nova portaria.</span>
-                        : <span>{finalPolygon ? "Área definida. Arraste os pontos para ajustar." : "Desenhe o perímetro exato do condomínio."}</span>
-                }
-            </div>
+            {!readOnly && (
+                <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-3 text-xs text-slate-400 flex items-center gap-2 z-10">
+                    <Info size={14} />
+                    {isDrawing
+                        ? <span>Clique no mapa para adicionar pontos. Clique no primeiro ponto ou "Concluir" para fechar.</span>
+                        : addingGate
+                            ? <span className="text-amber-400">Clique na localização da nova portaria.</span>
+                            : <span>{finalPolygon ? "Área definida. Arraste os pontos para ajustar." : "Desenhe o perímetro exato do condomínio."}</span>
+                    }
+                </div>
+            )}
         </>
     );
 }

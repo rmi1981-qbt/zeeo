@@ -61,6 +61,11 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
                             <CheckCircle2 size={10} />
                             <span>Pré-Autorizado</span>
                         </div>
+                    ) : delivery.status === 'authorized' ? (
+                        <div className="flex items-center space-x-1 mt-1 text-blue-400 text-[10px] uppercase font-bold tracking-wide">
+                            <ShieldCheck size={10} />
+                            <span>Autorizado</span>
+                        </div>
                     ) : (
                         <div className="flex items-center space-x-1 mt-1 text-slate-500 text-[10px] uppercase font-bold tracking-wide">
                             <ShieldCheck size={10} />
@@ -71,6 +76,18 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
                         <div className="flex items-center space-x-1 mt-1 text-yellow-500 text-[10px] uppercase font-bold tracking-wide animate-pulse bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
                             <MapPin size={10} />
                             <span>Chegando na {delivery.current_gate.name}</span>
+                        </div>
+                    )}
+                    {/* Authorization method badge */}
+                    {delivery.authorized_method && (
+                        <div className="flex items-center space-x-1 mt-1 text-[10px] text-slate-400 bg-slate-800/60 px-1.5 py-0.5 rounded">
+                            <span>
+                                {delivery.authorized_method === 'app_zeeo' ? '📱 App' :
+                                    delivery.authorized_method === 'whatsapp' ? '💬 WhatsApp' :
+                                        delivery.authorized_method === 'phone_call' ? '📞 Telefone' :
+                                            delivery.authorized_method === 'pre_authorized' ? '🔒 Pré-autorizado' :
+                                                delivery.authorized_method === 'intercom' ? '📞 Interfone' : '✋ Manual'}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -118,14 +135,14 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
                 <div className="grid grid-cols-2 gap-3 mt-2">
                     <button
                         onClick={() => onReject(delivery.id)}
-                        className="flex items-center justify-center space-x-1 py-3 rounded-lg border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-bold text-sm transition-colors"
+                        className="flex items-center justify-center space-x-1 py-3 rounded-lg border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-bold text-sm transition-colors min-h-[48px]"
                     >
                         <XCircle size={16} />
-                        <span>Rejeitar</span>
+                        <span>Recusar</span>
                     </button>
                     <button
                         onClick={() => onAuthorize(delivery.id)}
-                        className="flex items-center justify-center space-x-1 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02]"
+                        className="flex items-center justify-center space-x-1 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02] min-h-[48px]"
                     >
                         <CheckCircle2 size={16} />
                         <span>{primaryActionLabel}</span>

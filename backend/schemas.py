@@ -51,6 +51,16 @@ class DeliveryUpdate(BaseModel):
     driver_lat: Optional[float] = None
     driver_lng: Optional[float] = None
     eta: Optional[datetime] = None
+    # Authorization fields
+    authorization_method: Optional[str] = None  # app_zeeo, whatsapp, phone_call, intercom, pre_authorized, manual
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    actor_role: Optional[str] = None  # concierge, resident, admin, system
+    authorized_by_resident_id: Optional[str] = None
+    authorized_by_resident_name: Optional[str] = None
+    gate_id: Optional[str] = None
+    gate_name: Optional[str] = None
+    notes: Optional[str] = None
 
 class GateInfo(BaseModel):
     id: str
@@ -62,6 +72,36 @@ class Delivery(DeliveryBase):
     updated_at: Optional[datetime] = None
     current_gate_id: Optional[str] = None
     current_gate: Optional[GateInfo] = None
+    authorized_by: Optional[str] = None
+    authorized_method: Optional[str] = None
+    authorized_at: Optional[datetime] = None
+    entered_at: Optional[datetime] = None
+    exited_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# --- Delivery Event Schemas ---
+
+class DeliveryEventCreate(BaseModel):
+    delivery_id: str
+    condo_id: str
+    event_type: str
+    actor_id: Optional[str] = None
+    actor_role: Optional[str] = 'system'
+    actor_name: Optional[str] = None
+    authorization_method: Optional[str] = None
+    authorized_by_resident_id: Optional[str] = None
+    authorized_by_resident_name: Optional[str] = None
+    target_unit: Optional[str] = None
+    gate_id: Optional[str] = None
+    gate_name: Optional[str] = None
+    notes: Optional[str] = None
+    metadata: Optional[dict] = None
+
+class DeliveryEvent(DeliveryEventCreate):
+    id: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

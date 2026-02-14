@@ -44,9 +44,10 @@ export interface User {
 
 // --- Deliveries & Access ---
 
-export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'inside' | 'completed' | 'rejected';
+export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'authorized' | 'inside' | 'exited' | 'completed' | 'rejected';
 export type DeliverySource = 'app_zeeo' | 'webhook_provider';
 export type ProviderName = 'ifood' | 'rappi' | 'uber' | 'mercadolivre' | 'other';
+export type AuthorizationMethod = 'app_zeeo' | 'whatsapp' | 'phone_call' | 'intercom' | 'pre_authorized' | 'manual';
 
 export interface DriverSnapshot {
   name: string;
@@ -81,4 +82,30 @@ export interface Delivery {
     id: string;
     name: string;
   };
+
+  // Authorization
+  authorized_by?: string;
+  authorized_method?: AuthorizationMethod;
+  authorized_at?: string;
+  entered_at?: string;
+  exited_at?: string;
+}
+
+export interface DeliveryEvent {
+  id: string;
+  delivery_id: string;
+  condo_id: string;
+  event_type: string;
+  actor_id?: string;
+  actor_role?: string;
+  actor_name?: string;
+  authorization_method?: AuthorizationMethod;
+  authorized_by_resident_id?: string;
+  authorized_by_resident_name?: string;
+  target_unit?: string;
+  gate_id?: string;
+  gate_name?: string;
+  notes?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
 }

@@ -36,6 +36,46 @@ def parse_location(location_data):
         print(f"⚠️ Failed to parse location: {e}", flush=True)
         return None, None
 
+def log_delivery_event(delivery_id: str, condo_id: str, event_type: str, 
+                       status_update: schemas.DeliveryUpdate = None,
+                       target_unit: str = None, metadata: dict = None):
+    """Insert an immutable event into delivery_events."""
+    try:
+        event_data = {
+            'id': str(uuid.uuid4()),
+            'delivery_id': delivery_id,
+            'condo_id': condo_id,
+            'event_type': event_type,
+            'target_unit': target_unit,
+            'metadata': metadata or {},
+            'created_at': datetime.utcnow().isoformat()
+        }
+        
+        if status_update:
+            if status_update.actor_id:
+                event_data['actor_id'] = status_update.actor_id
+            if status_update.actor_role:
+                event_data['actor_role'] = status_update.actor_role
+            if status_update.actor_name:
+                event_data['actor_name'] = status_update.actor_name
+            if status_update.authorization_method:
+                event_data['authorization_method'] = status_update.authorization_method
+            if status_update.authorized_by_resident_id:
+                event_data['authorized_by_resident_id'] = status_update.authorized_by_resident_id
+            if status_update.authorized_by_resident_name:
+                event_data['authorized_by_resident_name'] = status_update.authorized_by_resident_name
+            if status_update.gate_id:
+                event_data['gate_id'] = status_update.gate_id
+            if status_update.gate_name:
+                event_data['gate_name'] = status_update.gate_name
+            if status_update.notes:
+                event_data['notes'] = status_update.notes
+        
+        supabase.table('delivery_events').insert(event_data).execute()
+        print(f"📝 Event logged: {event_type} for delivery {delivery_id}", flush=True)
+    except Exception as e:
+        print(f"⚠️ Failed to log delivery event: {e}", flush=True)
+
 @router.get("/", response_model=list[schemas.Delivery])
 def list_deliveries(condo_id: str = Query(..., description="Condo ID to filter deliveries"), unit: Optional[str] = Query(None, description="Unit label to filter")):
     """List deliveries for a specific condo, optionally filtered by unit"""
@@ -59,6 +99,21 @@ def list_deliveries(condo_id: str = Query(..., description="Condo ID to filter d
         print(f"❌ Error listing deliveries: {str(e)}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/events", response_model=list[schemas.DeliveryEvent])
+def list_condo_events(condo_id: str = Query(...), limit: int = Query(50, le=200)):
+    """List recent delivery events for a condominium"""
+    try:
+        response = (supabase.table('delivery_events')
+            .select('*')
+            .eq('condo_id', condo_id)
+            .order('created_at', desc=True)
+            .limit(limit)
+            .execute())
+        return response.data
+    except Exception as e:
+        print(f"❌ Error listing condo events: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/{delivery_id}", response_model=schemas.Delivery)
 def get_delivery(delivery_id: str):
     """Get a specific delivery"""
@@ -76,6 +131,20 @@ def get_delivery(delivery_id: str):
         raise
     except Exception as e:
         print(f"❌ Error getting delivery: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{delivery_id}/events", response_model=list[schemas.DeliveryEvent])
+def list_delivery_events(delivery_id: str):
+    """List all events for a specific delivery"""
+    try:
+        response = (supabase.table('delivery_events')
+            .select('*')
+            .eq('delivery_id', delivery_id)
+            .order('created_at', desc=False)
+            .execute())
+        return response.data
+    except Exception as e:
+        print(f"❌ Error listing delivery events: {str(e)}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/", response_model=schemas.Delivery)
@@ -101,6 +170,19 @@ def create_delivery(delivery: schemas.DeliveryCreate):
         result['driver_lat'] = delivery.driver_lat
         result['driver_lng'] = delivery.driver_lng
         
+        # Log the creation event
+        log_delivery_event(
+            delivery_id=result['id'],
+            condo_id=result['condo_id'],
+            event_type='created',
+            target_unit=result.get('unit'),
+            metadata={
+                'driver_name': delivery.driver_name,
+                'driver_plate': delivery.driver_plate,
+                'platform': delivery.platform
+            }
+        )
+        
         print(f"✅ Delivery created: {result['id']}", flush=True)
         return result
     except Exception as e:
@@ -110,15 +192,36 @@ def create_delivery(delivery: schemas.DeliveryCreate):
 
 @router.put("/{delivery_id}/status", response_model=schemas.Delivery)
 def update_delivery_status(delivery_id: str, status_update: schemas.DeliveryUpdate):
-    """Update delivery status or location"""
+    """Update delivery status or location, and log the event"""
     print(f"🔄 PUT /deliveries/{delivery_id}/status", flush=True)
     try:
-        # data = {k: v for k, v in status_update.dict().items() if v is not None}
-        data = status_update.dict(exclude={'driver_lat', 'driver_lng'}, exclude_unset=True)
+        data = status_update.dict(
+            exclude={'driver_lat', 'driver_lng', 'actor_id', 'actor_name', 'actor_role',
+                     'authorization_method', 'authorized_by_resident_id', 'authorized_by_resident_name',
+                     'gate_id', 'gate_name', 'notes'},
+            exclude_unset=True
+        )
         data['updated_at'] = datetime.utcnow().isoformat()
         
         if status_update.driver_lat is not None and status_update.driver_lng is not None:
             data['driver_location'] = f"SRID=4326;POINT({status_update.driver_lng} {status_update.driver_lat})"
+        
+        # Set authorization timestamps based on status
+        new_status = status_update.status
+        if new_status in ('authorized', 'at_gate') and status_update.authorization_method:
+            data['authorized_by'] = status_update.actor_id
+            data['authorized_method'] = status_update.authorization_method
+            data['authorized_at'] = datetime.utcnow().isoformat()
+        
+        if new_status == 'inside':
+            data['entered_at'] = datetime.utcnow().isoformat()
+        
+        if new_status == 'exited' or new_status == 'completed':
+            data['exited_at'] = datetime.utcnow().isoformat()
+
+        # Update gate_id if provided
+        if status_update.gate_id:
+            data['current_gate_id'] = status_update.gate_id
         
         response = supabase.table('deliveries').update(data).eq('id', delivery_id).execute()
         
@@ -129,6 +232,16 @@ def update_delivery_status(delivery_id: str, status_update: schemas.DeliveryUpda
         lat, lng = parse_location(result.get('driver_location'))
         result['driver_lat'] = lat
         result['driver_lng'] = lng
+
+        # Log the event
+        if new_status:
+            log_delivery_event(
+                delivery_id=delivery_id,
+                condo_id=result['condo_id'],
+                event_type=new_status,
+                status_update=status_update,
+                target_unit=result.get('unit')
+            )
 
         # Check proximity to gates (logging for now)
         if lat and lng:
@@ -144,10 +257,6 @@ def check_gate_proximity(delivery_id, lat, lng, condo_id, current_status):
     Check if driver is near any gate of the condo.
     """
     try:
-        # ... (logic to get gates)
-        
-        # Supabase RPC or raw sql is best, but we can also fetch all gates and calculate in python if few.
-        # Let's try fetching all gates for condo (usually few, < 10)
         response = supabase.table('gates').select('*').eq('condo_id', condo_id).is_('deleted_at', 'null').execute()
         gates = response.data
         
@@ -158,20 +267,17 @@ def check_gate_proximity(delivery_id, lat, lng, condo_id, current_status):
         min_dist = float('inf')
         
         for gate in gates:
-            # We need to parse gate location from HEX/WKB
             if not gate.get('location'): continue
             
             try:
-                # Basic python distance check
                 bin_loc = binascii.unhexlify(gate['location'])
                 gate_point = wkb.loads(bin_loc)
                 
-                # 0.001 deg ~= 111m.
                 dy = (gate_point.y - lat) * 111000
-                dx = (gate_point.x - lng) * 111000 * 0.9 # cos(lat) factor roughly
+                dx = (gate_point.x - lng) * 111000 * 0.9
                 dist = (dx*dx + dy*dy)**0.5
                 
-                if dist < 300: # 300 meters threshold
+                if dist < 300:
                     if dist < min_dist:
                         min_dist = dist
                         closest_gate = gate
@@ -183,15 +289,10 @@ def check_gate_proximity(delivery_id, lat, lng, condo_id, current_status):
         if closest_gate:
             print(f"🔔 Driver is {int(min_dist)}m from gate: {closest_gate['name']}", flush=True)
             try:
-                # Update delivery with current_gate_id
                 update_data = {
                     'current_gate_id': closest_gate['id'],
                     'updated_at': datetime.utcnow().isoformat()
                 }
-                
-                # Status Transitions based on distance
-                # If < 50m -> at_gate
-                # If < 300m -> approaching
                 
                 new_status = None
                 if min_dist < 50:
@@ -204,6 +305,18 @@ def check_gate_proximity(delivery_id, lat, lng, condo_id, current_status):
                 if new_status:
                     update_data['status'] = new_status
                     print(f"🔄 Updating status to {new_status}", flush=True)
+                    
+                    # Log the proximity-triggered event
+                    log_delivery_event(
+                        delivery_id=delivery_id,
+                        condo_id=condo_id,
+                        event_type=new_status,
+                        metadata={
+                            'trigger': 'proximity',
+                            'distance_m': int(min_dist),
+                            'gate_name': closest_gate['name']
+                        }
+                    )
 
                 supabase.table('deliveries').update(update_data).eq('id', delivery_id).execute()
             except Exception as e:
@@ -217,12 +330,8 @@ def delete_delivery(delivery_id: str):
     """Delete a delivery"""
     try:
         response = supabase.table('deliveries').delete().eq('id', delivery_id).execute()
-        if not response.data: # Supabase delete returns the deleted row(s)
-             # If no row returned, it might check if it existed? 
-             # Actually Supabase DELETE returns data by default
-             pass 
-             # If strictly checking 404, we might need to select first. 
-             # But for DELETE, idempotency is fine or we can assume if no data, it wasn't there.
+        if not response.data:
+             pass
         return {"message": "Delivery deleted successfully"}  
     except Exception as e:
         print(f"❌ Error deleting delivery: {str(e)}", flush=True)
