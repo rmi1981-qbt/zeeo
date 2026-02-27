@@ -1,15 +1,16 @@
-import React from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { type Condo } from '../services/condoService';
 import '../styles/CondoGridView.css';
 
 interface CondoGridViewProps {
     condos: Condo[];
+    onSelect: (condo: Condo) => void;
     onViewOnMap: (condo: Condo) => void;
     onDelete: (condo: Condo) => void;
 }
 
-export function CondoGridView({ condos, onViewOnMap, onDelete }: CondoGridViewProps) {
+export function CondoGridView({ condos, onSelect, onViewOnMap, onDelete }: CondoGridViewProps) {
     const navigate = useNavigate();
 
     function handleEdit(condo: Condo) {
@@ -44,7 +45,15 @@ export function CondoGridView({ condos, onViewOnMap, onDelete }: CondoGridViewPr
                                 </p>
                             )}
                         </div>
-                        <div className="card-actions">
+                        <div className="card-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
+                            <button
+                                className="btn-primary"
+                                onClick={() => onSelect(condo)}
+                                title="Acessar painel do condomínio"
+                                style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.25rem', fontWeight: 'bold', cursor: 'pointer', flex: '1 1 100%' }}
+                            >
+                                Acessar Painel
+                            </button>
                             <button
                                 className="btn-card-edit"
                                 onClick={() => handleEdit(condo)}

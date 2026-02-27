@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, Loader2, MapPin } from 'lucide-react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
 interface PlaceSearchBoxProps {
     onPlaceSelect: (place: google.maps.places.PlaceResult) => void;

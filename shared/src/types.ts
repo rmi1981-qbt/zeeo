@@ -52,8 +52,9 @@ export type AuthorizationMethod = 'app_zeeo' | 'whatsapp' | 'phone_call' | 'inte
 export interface DriverSnapshot {
   name: string;
   plate?: string;
-  photoUrl?: string;
+  photoUrl?: string; // URL da foto (ex: enviada pelo iFood)
   documentHash?: string;
+  isBiometricVerified?: boolean; // Flag indicando se a biometria foi validada pela integração
 }
 
 export interface Delivery {

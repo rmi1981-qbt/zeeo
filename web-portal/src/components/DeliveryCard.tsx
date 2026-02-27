@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Delivery } from '@zeeo/shared';
-import { motion } from 'framer-motion';
-import { Truck, MapPin, CheckCircle2, XCircle, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Truck, MapPin, CheckCircle2, XCircle, ShieldCheck, Fingerprint, ScanFace } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -26,8 +26,27 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
     compact = false,
     primaryActionLabel = "Autorizar"
 }, ref) => {
+    const [isVerifyingMatch, setIsVerifyingMatch] = useState(false);
+    const [matchSuccess, setMatchSuccess] = useState(false);
+
     const isArriving = delivery.status === 'arriving';
     const isPreAuth = delivery.status === 'pre_authorized';
+    const hasBiometrics = delivery.driver_snapshot.isBiometricVerified;
+
+    const handleAuthorizeClick = () => {
+        if (hasBiometrics && delivery.status === 'at_gate') {
+            // Trigger visual Face Match Simulation
+            setIsVerifyingMatch(true);
+            setTimeout(() => {
+                setMatchSuccess(true);
+                setTimeout(() => {
+                    onAuthorize(delivery.id);
+                }, 1000); // 1 second showing success before dispatching
+            }, 1500); // 1.5 second scanning animation
+        } else {
+            onAuthorize(delivery.id);
+        }
+    };
 
     return (
         <motion.div
@@ -48,6 +67,50 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
             {isArriving && (
                 <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-400 to-blue-600 animate-pulse" />
             )}
+
+            {/* Flash Overlay for Biometric Match */}
+            <AnimatePresence>
+                {isVerifyingMatch && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center p-4 rounded-xl"
+                    >
+                        {!matchSuccess ? (
+                            <motion.div
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ repeat: Infinity, duration: 1 }}
+                                className="flex flex-col items-center"
+                            >
+                                <ScanFace size={48} className="text-primary-500 mb-3" />
+                                <div className="text-primary-400 font-bold text-center tracking-widest uppercase text-sm">
+                                    Conferindo Biometria...
+                                </div>
+                                {/* Scanning line */}
+                                <motion.div
+                                    className="w-32 h-0.5 bg-primary-500 mt-2 shadow-[0_0_10px_rgba(59,130,246,0.8)]"
+                                    animate={{ y: [-15, 15, -15] }}
+                                    transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+                                />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                initial={{ scale: 0.8, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="flex flex-col items-center"
+                            >
+                                <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+                                    <CheckCircle2 size={32} className="text-emerald-500" />
+                                </div>
+                                <div className="text-emerald-400 font-bold text-center tracking-widest uppercase text-sm">
+                                    Match 99.8% Confirmado
+                                </div>
+                            </motion.div>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Header: Unit & Badge */}
             <div className="flex justify-between items-start mb-3 pl-2">
@@ -75,7 +138,7 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
                     {delivery.status === 'approaching' && delivery.current_gate && (
                         <div className="flex items-center space-x-1 mt-1 text-yellow-500 text-[10px] uppercase font-bold tracking-wide animate-pulse bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
                             <MapPin size={10} />
-                            <span>Chegando na {delivery.current_gate.name}</span>
+                            <span>Chegando {delivery.current_gate.name ? 'na ' + delivery.current_gate.name : ''}</span>
                         </div>
                     )}
                     {/* Authorization method badge */}
@@ -91,34 +154,66 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
                         </div>
                     )}
                 </div>
-                <span className={cn(
-                    "text-[10px] px-2 py-1 rounded-md uppercase font-bold tracking-wider",
-                    delivery.provider === 'ifood' ? "bg-[#EA1D2C]/20 text-[#EA1D2C]" :
-                        delivery.provider === 'mercadolivre' ? "bg-[#FFE600]/20 text-[#FFE600]" :
-                            delivery.provider === 'uber' ? "bg-black/40 text-white" : "bg-slate-700 text-slate-300"
-                )}>
-                    {delivery.provider}
-                </span>
+
+                <div className="flex flex-col items-end gap-1">
+                    <span className={cn(
+                        "text-[10px] px-2 py-1 rounded-md uppercase font-bold tracking-wider",
+                        delivery.provider === 'ifood' ? "bg-[#EA1D2C]/20 text-[#EA1D2C]" :
+                            delivery.provider === 'mercadolivre' ? "bg-[#FFE600]/20 text-[#FFE600]" :
+                                delivery.provider === 'uber' ? "bg-black/40 text-white" : "bg-slate-700 text-slate-300"
+                    )}>
+                        {delivery.provider}
+                    </span>
+                    {hasBiometrics && (
+                        <span className="text-[9px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 uppercase font-bold tracking-wide border border-emerald-500/30 flex items-center space-x-1">
+                            <Fingerprint size={10} />
+                            <span>Biometria Verificada</span>
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* Driver Info */}
             <div className={cn("flex items-center space-x-4", compact ? "mb-2" : "mb-4")}>
-                <div className="relative">
-                    <img
-                        src={delivery.driver_snapshot.photoUrl}
-                        className={cn(
-                            "rounded-full object-cover ring-2 ring-slate-700",
+                <div className="relative shrink-0">
+                    {delivery.driver_snapshot.photoUrl ? (
+                        <img
+                            src={delivery.driver_snapshot.photoUrl}
+                            className={cn(
+                                "rounded-full object-cover ring-2",
+                                hasBiometrics ? "ring-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "ring-slate-700",
+                                compact ? "w-10 h-10" : "w-16 h-16"
+                            )}
+                            onError={(e) => {
+                                // Fallback if image fails to load
+                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(delivery.driver_snapshot.name)}&background=334155&color=94a3b8`;
+                            }}
+                        />
+                    ) : (
+                        <div className={cn(
+                            "rounded-full bg-slate-800 flex items-center justify-center ring-2",
+                            hasBiometrics ? "ring-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" : "ring-slate-700",
                             compact ? "w-10 h-10" : "w-16 h-16"
-                        )}
-                    />
-                    {delivery.driver_snapshot.documentHash && (
-                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 border border-slate-900">
+                        )}>
+                            <span className={cn("font-bold text-slate-500", compact ? "text-sm" : "text-xl")}>
+                                {delivery.driver_snapshot.name.charAt(0)}
+                            </span>
+                        </div>
+                    )}
+
+                    {delivery.driver_snapshot.documentHash && !hasBiometrics && (
+                        <div className="absolute -bottom-1 -right-1 bg-blue-500 rounded-full p-0.5 border border-slate-900" title="Documento Validado">
                             <ShieldCheck size={12} className="text-white" />
                         </div>
                     )}
+                    {hasBiometrics && (
+                        <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 border border-slate-900" title="Biometria Confirmada">
+                            <ScanFace size={12} className="text-white" />
+                        </div>
+                    )}
                 </div>
-                <div>
-                    <h3 className={cn("font-bold text-slate-100", compact ? "text-sm" : "text-lg")}>
+                <div className="overflow-hidden">
+                    <h3 className={cn("font-bold text-slate-100 truncate", compact ? "text-sm" : "text-lg")} title={delivery.driver_snapshot.name}>
                         {delivery.driver_snapshot.name}
                     </h3>
                     <div className="flex items-center space-x-2 mt-0.5 bg-black/20 px-2 py-0.5 rounded inline-block">
@@ -135,17 +230,24 @@ export const DeliveryCard = React.forwardRef<HTMLDivElement, DeliveryCardProps>(
                 <div className="grid grid-cols-2 gap-3 mt-2">
                     <button
                         onClick={() => onReject(delivery.id)}
-                        className="flex items-center justify-center space-x-1 py-3 rounded-lg border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-bold text-sm transition-colors min-h-[48px]"
+                        disabled={isVerifyingMatch}
+                        className="flex items-center justify-center space-x-1 py-3 rounded-lg border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 font-bold text-sm transition-colors min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <XCircle size={16} />
                         <span>Recusar</span>
                     </button>
                     <button
-                        onClick={() => onAuthorize(delivery.id)}
-                        className="flex items-center justify-center space-x-1 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/20 transition-all hover:scale-[1.02] min-h-[48px]"
+                        onClick={handleAuthorizeClick}
+                        disabled={isVerifyingMatch}
+                        className={cn(
+                            "flex items-center justify-center space-x-1 py-3 rounded-lg font-bold text-sm shadow-lg transition-all min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed",
+                            hasBiometrics
+                                ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20 hover:scale-[1.02]"
+                                : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20 hover:scale-[1.02]"
+                        )}
                     >
-                        <CheckCircle2 size={16} />
-                        <span>{primaryActionLabel}</span>
+                        {hasBiometrics ? <ScanFace size={16} /> : <CheckCircle2 size={16} />}
+                        <span>{hasBiometrics ? "Face Match & Liberar" : primaryActionLabel}</span>
                     </button>
                 </div>
             )}

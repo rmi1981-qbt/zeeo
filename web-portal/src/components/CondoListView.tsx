@@ -1,15 +1,16 @@
-import React from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { type Condo } from '../services/condoService';
 import '../styles/CondoListView.css';
 
 interface CondoListViewProps {
     condos: Condo[];
+    onSelect: (condo: Condo) => void;
     onViewOnMap: (condo: Condo) => void;
     onDelete: (condo: Condo) => void;
 }
 
-export function CondoListView({ condos, onViewOnMap, onDelete }: CondoListViewProps) {
+export function CondoListView({ condos, onSelect, onViewOnMap, onDelete }: CondoListViewProps) {
     const navigate = useNavigate();
 
     function handleEdit(condo: Condo) {
@@ -45,6 +46,14 @@ export function CondoListView({ condos, onViewOnMap, onDelete }: CondoListViewPr
                             )}
                         </div>
                         <div className="condo-actions">
+                            <button
+                                className="btn-primary"
+                                onClick={() => onSelect(condo)}
+                                title="Acessar painel do condomínio"
+                                style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '0.25rem', fontWeight: 'bold', cursor: 'pointer' }}
+                            >
+                                Acessar Painel
+                            </button>
                             <button
                                 className="btn-edit"
                                 onClick={() => handleEdit(condo)}

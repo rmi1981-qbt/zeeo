@@ -16,30 +16,36 @@ const getRandomLocation = (type: 'inside' | 'outside') => {
     };
 };
 
-const mapApiToUi = (d: ApiDelivery): Delivery => ({
-    id: d.id,
-    status: (d.status as DeliveryStatus) || 'created',
-    source: 'webhook_provider',
-    provider: (d.platform as any) || 'other',
-    externalId: d.id,
-    driver_snapshot: {
-        name: d.driver_name || 'Desconhecido',
-        plate: d.driver_plate || '---',
-        photoUrl: d.driver_photo,
-    },
-    condoId: d.condo_id,
-    target_unit_label: d.unit || 'Portaria',
-    target_user_ids: [],
-    location: (d.driver_lat && d.driver_lng) ? { lat: d.driver_lat, lng: d.driver_lng } : undefined,
-    createdAt: d.created_at,
-    updatedAt: d.updated_at || d.created_at,
-    current_gate: d.current_gate,
-    authorized_by: d.authorized_by,
-    authorized_method: d.authorized_method as any,
-    authorized_at: d.authorized_at,
-    entered_at: d.entered_at,
-    exited_at: d.exited_at,
-});
+const mapApiToUi = (d: ApiDelivery): Delivery => {
+    const hasBiometrics = d.driver_photo?.includes('#verified') || false;
+    const cleanPhotoUrl = d.driver_photo?.replace('#verified', '');
+
+    return {
+        id: d.id,
+        status: (d.status as DeliveryStatus) || 'created',
+        source: 'webhook_provider',
+        provider: (d.platform as any) || 'other',
+        externalId: d.id,
+        driver_snapshot: {
+            name: d.driver_name || 'Desconhecido',
+            plate: d.driver_plate || '---',
+            photoUrl: cleanPhotoUrl,
+            isBiometricVerified: hasBiometrics,
+        },
+        condoId: d.condo_id,
+        target_unit_label: d.unit || 'Portaria',
+        target_user_ids: [],
+        location: (d.driver_lat && d.driver_lng) ? { lat: d.driver_lat, lng: d.driver_lng } : undefined,
+        createdAt: d.created_at,
+        updatedAt: d.updated_at || d.created_at,
+        current_gate: d.current_gate,
+        authorized_by: d.authorized_by,
+        authorized_method: d.authorized_method as any,
+        authorized_at: d.authorized_at,
+        entered_at: d.entered_at,
+        exited_at: d.exited_at,
+    };
+};
 
 export function useDeliveries(condoId: string) {
     const [deliveries, setDeliveries] = useState<Delivery[]>([]);
@@ -179,4 +185,3 @@ export function useDeliveries(condoId: string) {
         updateStatus
     };
 }
-

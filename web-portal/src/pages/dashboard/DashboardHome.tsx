@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Delivery } from '@zeeo/shared';
 import { Gate, condoService } from '../../services/condoService';
+import { SalesDemoInjector } from '../../components/SalesDemoInjector';
 
 const DashboardHome: React.FC = () => {
     const { selectedCondo } = useAuth();
@@ -47,6 +48,30 @@ const DashboardHome: React.FC = () => {
     }, [selectedCondo]);
 
 
+    // Listen for Demo Injection Events
+    useEffect(() => {
+        const handleDemoAuth = (e: Event) => {
+            const customEvent = e as CustomEvent<{ method: string }>;
+
+            // Find the most recent delivery waiting for authorization
+            const targetDeliveries = deliveries.filter(d => ['approaching', 'pre_authorized', 'arriving', 'at_gate'].includes(d.status || ''));
+
+            if (targetDeliveries.length > 0) {
+                const target = targetDeliveries[0];
+                updateStatus(target.id, {
+                    status: 'authorized',
+                    authorization_method: customEvent.detail.method,
+                    actor_role: 'resident',
+                    actor_name: 'Morador Teste (Demo)'
+                });
+            } else {
+                console.warn("No pending delivery found to authorize");
+            }
+        };
+
+        window.addEventListener('demo-authorize', handleDemoAuth);
+        return () => window.removeEventListener('demo-authorize', handleDemoAuth);
+    }, [deliveries, updateStatus]);
 
     // Strict filter for 'Filtered' view
     const displayedDeliveries = selectedGateId
@@ -196,6 +221,8 @@ const DashboardHome: React.FC = () => {
 
             {/* Background Texture */}
             <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+
+            <SalesDemoInjector />
         </div>
     );
 };

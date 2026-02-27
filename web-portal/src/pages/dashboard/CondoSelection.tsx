@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import { SearchFilters } from '../../components/SearchFilters';
 import { CondoListView } from '../../components/CondoListView';
 import { CondoGridView } from '../../components/CondoGridView';
@@ -10,6 +12,8 @@ import '../../styles/CondoSelector.css';
 type ViewMode = 'list' | 'grid' | 'map';
 
 export default function CondoSelector() {
+    const { selectCondo } = useAuth();
+    const navigate = useNavigate();
     const [condos, setCondos] = useState<Condo[]>([]);
     const [filteredCondos, setFilteredCondos] = useState<Condo[]>([]);
     const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -39,6 +43,11 @@ export default function CondoSelector() {
 
         loadCondos();
     }, []);
+
+    function handleSelectCondo(condo: Condo) {
+        selectCondo(condo.id);
+        navigate('/'); // Redirect to let RoleBasedRedirect route the user
+    }
 
     function handleViewOnMap(condo: Condo) {
         // Mudar para visualização de mapa se não estiver
@@ -159,6 +168,7 @@ export default function CondoSelector() {
                         {viewMode === 'list' && (
                             <CondoListView
                                 condos={filteredCondos}
+                                onSelect={handleSelectCondo}
                                 onViewOnMap={handleViewOnMap}
                                 onDelete={requestDelete}
                             />
@@ -167,6 +177,7 @@ export default function CondoSelector() {
                         {viewMode === 'grid' && (
                             <CondoGridView
                                 condos={filteredCondos}
+                                onSelect={handleSelectCondo}
                                 onViewOnMap={handleViewOnMap}
                                 onDelete={requestDelete}
                             />

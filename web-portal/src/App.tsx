@@ -7,6 +7,7 @@ import Register from './pages/auth/Register';
 import CondoSelection from './pages/dashboard/CondoSelection';
 import CondominiumSettings from './pages/dashboard/CondominiumSettings';
 import DashboardHome from './pages/dashboard/DashboardHome';
+import IntegrationsHub from './pages/dashboard/IntegrationsHub';
 import Concierge from './pages/Concierge';
 import CondoRegistrationWizard from './components/CondoRegistrationWizard';
 import { BugMonitor } from './components/BugMonitor';
@@ -76,6 +77,7 @@ function App() {
                                 <Route path="/condo-setup" element={<AdminMap />} />
                                 <Route path="/settings/:condoId" element={<CondominiumSettings />} />
                                 <Route path="/condominium-settings" element={<CondominiumSettings />} />
+                                <Route path="/integrations" element={<IntegrationsHub />} />
                             </Route>
                         </Route>
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Building2, SlidersHorizontal } from 'lucide-react';
+import { Settings, Building2, SlidersHorizontal, Blocks } from 'lucide-react';
 
 type MenuItem = {
     label: string;
@@ -38,6 +38,12 @@ const SettingsDropdown: React.FC<SettingsDropdownProps> = ({ selectedCondo, isPl
             path: `/settings/${selectedCondo}`,
             icon: <SlidersHorizontal size={16} />,
             visible: !!selectedCondo, // Disponível para todos os admins quando há condomínio selecionado
+        },
+        {
+            label: 'Hub de Integrações',
+            path: '/integrations',
+            icon: <Blocks size={16} />,
+            visible: !!selectedCondo, // Disponível para gerenciar integrações do condomínio selecionado
         },
     ];
 
