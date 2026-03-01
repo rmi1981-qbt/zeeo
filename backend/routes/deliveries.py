@@ -4,7 +4,7 @@ from database import supabase
 import schemas
 import uuid
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 from shapely import wkb
 from shapely.geometry import Point, mapping
 import binascii
@@ -75,6 +75,130 @@ def log_delivery_event(delivery_id: str, condo_id: str, event_type: str,
         print(f"📝 Event logged: {event_type} for delivery {delivery_id}", flush=True)
     except Exception as e:
         print(f"⚠️ Failed to log delivery event: {e}", flush=True)
+
+@router.get("/active", response_model=list[schemas.Delivery])
+def list_active_deliveries(condo_id: str = Query(..., description="Condo ID to filter deliveries")):
+    """List active processes for the gatekeeper dashboard.
+       Includes incoming, at gate, inside, and recently exited (< visibility timeout)."""
+    try:
+        # Get condo timeout config
+        timeout_mins = 5
+        try:
+            config_res = supabase.table('condominiums').select('exit_visibility_timeout_mins').eq('id', condo_id).execute()
+            if config_res.data and config_res.data[0].get('exit_visibility_timeout_mins'):
+                timeout_mins = config_res.data[0]['exit_visibility_timeout_mins']
+        except Exception as config_err:
+            print(f"⚠️ Could not fetch exit_visibility_timeout_mins (column may not exist): {config_err}", flush=True)
+
+        # Calculate cutoff time for exiting early
+        cutoff_time = datetime.utcnow() - timedelta(minutes=timeout_mins)
+        
+        # We fetch all deliveries from the last 24h to be safe, then filter in python
+        yesterday = (datetime.utcnow() - timedelta(days=1)).isoformat()
+        response = supabase.table('deliveries').select('*, current_gate:gates(id, name)').eq('condo_id', condo_id).gte('updated_at', yesterday).order('updated_at', desc=True).execute()
+        
+        active_deliveries = []
+        for d in response.data:
+            status = d.get('status')
+            
+            # If final status, check if it was recently exited/completed
+            if status in ('exited', 'completed', 'rejected', 'superseded'):
+                updated_at_str = d.get('updated_at') or d.get('created_at')
+                # Try to parse standard ISO format handling Z
+                if updated_at_str.endswith('Z'):
+                    updated_at_str = updated_at_str[:-1]
+                try:
+                    # Strip fractional seconds for standard parsing if needed, but fromisoformat handles simple cases in 3.11+
+                    updated_dt = datetime.fromisoformat(updated_at_str.split('+')[0])
+                    if updated_dt < cutoff_time:
+                        continue # Skip, it's older than timeout
+                except Exception as e:
+                    print(f"Time parse error for delivery {d['id']}: {e}")
+                    pass
+            
+            lat, lng = parse_location(d.get('driver_location'))
+            d['driver_lat'] = lat
+            d['driver_lng'] = lng
+            active_deliveries.append(d)
+            
+        return active_deliveries
+    except Exception as e:
+        print(f"❌ Error listing active deliveries: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/webhook", response_model=schemas.Delivery)
+def authorization_webhook(payload: schemas.WebhookPayload):
+    """Webhook for WhatsApp/Push auto-approval (first response wins)."""
+    print(f"🔔 Webhook received for {payload.delivery_id} via {payload.channel} (Decision: {payload.decision})", flush=True)
+    try:
+        # Fetch current delivery
+        response = supabase.table('deliveries').select('*').eq('id', payload.delivery_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Delivery not found")
+        
+        d = response.data[0]
+        current_status = d.get('status')
+        existing_method = d.get('authorized_method')
+        
+        # If already authorized or denied, flag conflict if decision is different
+        conflict = False
+        new_status = payload.decision
+        
+        if current_status in ('authorized', 'denied', 'rejected'):
+            if current_status != new_status:
+                conflict = True
+                print(f"⚠️ Conflict detected: Delivery {d['id']} was {current_status} by {existing_method}, now webhook says {new_status} via {payload.channel}")
+                # We do not override the first response. The first response wins.
+                new_status = current_status # Keep old status
+            else:
+                # Same decision, ignore redundant webhook
+                return d
+        
+        # Build update
+        update_data = {
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        if not conflict and current_status not in ('authorized', 'denied', 'rejected'):
+            # First response!
+            update_data['status'] = new_status
+            update_data['authorized_method'] = payload.channel
+            update_data['authorized_by'] = payload.actor_id
+            update_data['authorized_at'] = datetime.utcnow().isoformat()
+            
+        # Add to request channels
+        request_channels = d.get('request_channels') or []
+        if payload.channel not in request_channels:
+            request_channels.append(payload.channel)
+        update_data['request_channels'] = request_channels
+            
+        # Execute update
+        update_resp = supabase.table('deliveries').update(update_data).eq('id', payload.delivery_id).execute()
+        result = update_resp.data[0]
+        
+        # Log event
+        event_metadata = {
+            'channel': payload.channel,
+            'decision': payload.decision,
+            'conflict_flagged': conflict
+        }
+        if payload.notes:
+            event_metadata['notes'] = payload.notes
+            
+        log_delivery_event(
+            delivery_id=payload.delivery_id,
+            condo_id=d['condo_id'],
+            event_type='webhook_received',
+            target_unit=d.get('unit'),
+            metadata=event_metadata
+        )
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in webhook: {str(e)}", flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/", response_model=list[schemas.Delivery])
 def list_deliveries(condo_id: str = Query(..., description="Condo ID to filter deliveries"), unit: Optional[str] = Query(None, description="Unit label to filter")):

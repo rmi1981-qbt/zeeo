@@ -1,0 +1,17 @@
+ M shared/src/types.ts
+ M web-portal/src/App.tsx
+ M web-portal/src/components/CondoGridView.tsx
+ M web-portal/src/components/CondoListView.tsx
+ M web-portal/src/components/ConfirmDialog.tsx
+ M web-portal/src/components/DeliveryCard.tsx
+ M web-portal/src/components/PlaceSearchBox.tsx
+ M web-portal/src/components/SearchFilters.tsx
+ M web-portal/src/components/SettingsDropdown.tsx
+ M web-portal/src/hooks/useDeliveries.tsx
+ M web-portal/src/pages/dashboard/CondoSelection.tsx
+ M web-portal/src/pages/dashboard/DashboardHome.tsx
+ M web-portal/src/pages/resident/ResidentDashboard.tsx
+?? clean_status.txt
+?? git_status.txt
+?? web-portal/src/components/SalesDemoInjector.tsx
+?? web-portal/src/pages/dashboard/IntegrationsHub.tsx

@@ -2,47 +2,20 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Fingerprint, Zap, Store, Truck, ShoppingBag, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { deliveryService } from '../services/deliveryService';
 
-export const SalesDemoInjector: React.FC = () => {
+interface SalesDemoInjectorProps {
+    onRequestInjection: (provider: 'ifood' | 'mercadolivre' | 'ubereats', withBiometrics: boolean) => void;
+}
+
+export const SalesDemoInjector: React.FC<SalesDemoInjectorProps> = ({ onRequestInjection }) => {
     const { selectedCondo } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
-    const [isInjecting, setIsInjecting] = useState(false);
 
     if (!selectedCondo) return null;
 
-    const injectDelivery = async (provider: 'ifood' | 'mercadolivre' | 'ubereats', withBiometrics: boolean) => {
-        setIsInjecting(true);
-
-        const providersMap = {
-            ifood: { name: 'João Entregador', photo: 'https://randomuser.me/api/portraits/men/32.jpg' },
-            mercadolivre: { name: 'Carlos Logística', photo: 'https://randomuser.me/api/portraits/men/44.jpg' },
-            ubereats: { name: 'Motorista Ana', photo: 'https://randomuser.me/api/portraits/women/68.jpg' },
-        };
-
-        const loc = { lat: -23.5510, lng: -46.6340 }; // Approaching location
-
-        const pInfo = providersMap[provider];
-        const newDelivery = {
-            condo_id: selectedCondo,
-            status: 'approaching' as const, // For iFood/ML it's usually approaching or pre_authorized
-            platform: provider,
-            driver_name: pInfo.name,
-            driver_plate: 'TST-9999',
-            driver_photo: withBiometrics ? `${pInfo.photo}#verified` : pInfo.photo,
-            driver_lat: loc.lat,
-            driver_lng: loc.lng,
-            unit: `Apto ${Math.floor(Math.random() * 800) + 100}`
-        };
-
-        try {
-            await deliveryService.createDelivery(newDelivery);
-            setIsOpen(false);
-        } catch (e) {
-            console.error("Failed to inject demo delivery", e);
-        } finally {
-            setIsInjecting(false);
-        }
+    const injectDelivery = (provider: 'ifood' | 'mercadolivre' | 'ubereats', withBiometrics: boolean) => {
+        onRequestInjection(provider, withBiometrics);
+        setIsOpen(false);
     };
 
     return (
@@ -71,9 +44,8 @@ export const SalesDemoInjector: React.FC = () => {
                             </div>
 
                             <button
-                                disabled={isInjecting}
                                 onClick={() => injectDelivery('ifood', true)}
-                                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700 hover:bg-slate-800 transition-colors group disabled:opacity-50"
+                                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700 hover:bg-slate-800 transition-colors group"
                             >
                                 <div className="flex items-center space-x-3 text-slate-300">
                                     <Store size={18} className="text-red-500" />
@@ -83,9 +55,8 @@ export const SalesDemoInjector: React.FC = () => {
                             </button>
 
                             <button
-                                disabled={isInjecting}
                                 onClick={() => injectDelivery('mercadolivre', false)}
-                                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700 hover:bg-slate-800 transition-colors group disabled:opacity-50"
+                                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700 hover:bg-slate-800 transition-colors group"
                             >
                                 <div className="flex items-center space-x-3 text-slate-300">
                                     <ShoppingBag size={18} className="text-yellow-400" />
@@ -94,9 +65,8 @@ export const SalesDemoInjector: React.FC = () => {
                             </button>
 
                             <button
-                                disabled={isInjecting}
                                 onClick={() => injectDelivery('ubereats', true)}
-                                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700 hover:bg-slate-800 transition-colors group disabled:opacity-50"
+                                className="w-full flex items-center justify-between p-3 rounded-xl bg-slate-800/30 border border-slate-700 hover:bg-slate-800 transition-colors group"
                             >
                                 <div className="flex items-center space-x-3 text-slate-300">
                                     <Truck size={18} className="text-slate-100" />
@@ -139,7 +109,7 @@ export const SalesDemoInjector: React.FC = () => {
                 title="Sales Demo Menu"
                 className="w-12 h-12 bg-primary-600 hover:bg-primary-500 text-white rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.5)] transition-colors"
             >
-                <Zap size={20} className={isInjecting ? 'animate-pulse' : ''} />
+                <Zap size={20} />
             </button>
         </div>
     );

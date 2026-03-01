@@ -1,24 +1,77 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useDeliveries } from '../hooks/useDeliveries';
-import { DeliveryCard } from '../components/DeliveryCard';
 import LiveMap from '../components/LiveMap';
 import { AnimatePresence } from 'framer-motion';
 import { condoService } from '../services/condoService';
-import {
-    History
-} from 'lucide-react';
+import { deliveryService } from '../services/deliveryService';
+import { ActiveProcessListItem } from '../components/Gatekeeper/ActiveProcessListItem';
+import { ManualAuthorizationModal, PhoneCallOutcome } from '../components/Gatekeeper/ManualAuthorizationModal';
+import { History } from 'lucide-react';
+import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
 const Concierge: React.FC = () => {
     const { selectedCondo } = useAuth();
-    const { deliveries, updateStatus } = useDeliveries(selectedCondo || 'mock');
-
-
+    const { deliveries, updateStatus, fetchDeliveries } = useDeliveries(selectedCondo || 'mock');
 
     const [providerFilter, setProviderFilter] = useState<string>('all');
-
     const [gates, setGates] = useState<{ id: string; name: string; lat: number; lng: number; is_main: boolean }[]>([]);
     const [condoCenter, setCondoCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
+    const [condoPerimeter, setCondoPerimeter] = useState<{ lat: number; lng: number }[]>([]);
+
+    // Injection State
+    const [pendingInjection, setPendingInjection] = useState<{ provider: 'ifood' | 'mercadolivre' | 'ubereats', withBiometrics: boolean } | null>(null);
+
+    // Modal state
+    const [phoneModalDeliveryId, setPhoneModalDeliveryId] = useState<string | null>(null);
+
+    const handlePhoneCallSubmit = async (outcome: PhoneCallOutcome) => {
+        if (!phoneModalDeliveryId) return;
+
+        const newStatus = outcome.status === 'authorized' ? 'authorized' :
+            outcome.status === 'denied' ? 'denied' : 'pending_authorization';
+
+        await updateStatus(phoneModalDeliveryId, {
+            status: newStatus,
+            authorization_method: 'phone_call',
+            actor_role: 'concierge',
+            authorized_by_resident_name: outcome.authorizerName,
+            notes: outcome.status === 'no_answer' ? 'Morador não atendeu' : undefined
+        });
+        setPhoneModalDeliveryId(null);
+    };
+
+    const handleMapClick = async (lat: number, lng: number) => {
+        if (!pendingInjection || !selectedCondo) return;
+
+        const { provider, withBiometrics } = pendingInjection;
+        const providersMap = {
+            ifood: { name: 'João Entregador', photo: 'https://randomuser.me/api/portraits/men/32.jpg' },
+            mercadolivre: { name: 'Carlos Logística', photo: 'https://randomuser.me/api/portraits/men/44.jpg' },
+            ubereats: { name: 'Motorista Ana', photo: 'https://randomuser.me/api/portraits/women/68.jpg' },
+        };
+        const pInfo = providersMap[provider];
+
+        const newDelivery = {
+            condo_id: selectedCondo,
+            status: 'approaching' as const,
+            platform: provider,
+            driver_name: pInfo.name,
+            driver_plate: 'TST-9999',
+            driver_photo: withBiometrics ? `${pInfo.photo}#verified` : pInfo.photo,
+            driver_lat: lat,
+            driver_lng: lng,
+            unit: `Apto ${Math.floor(Math.random() * 800) + 100}`
+        };
+
+        try {
+            await deliveryService.createDelivery(newDelivery);
+            setPendingInjection(null);
+            fetchDeliveries(); // Force update so it appears instantly
+        } catch (e) {
+            console.error("Failed to inject demo delivery", e);
+        }
+    };
 
     useEffect(() => {
         if (selectedCondo) {
@@ -37,23 +90,55 @@ const Concierge: React.FC = () => {
                 })
                 .catch(err => console.error('Failed to fetch gates', err));
 
-            // Fetch Condo Details for Center
+            // Fetch Condo Details for Center & Perimeter
             condoService.getCondo(selectedCondo)
                 .then(data => {
                     if (data.lat && data.lng) {
                         setCondoCenter({ lat: data.lat, lng: data.lng });
+                    }
+                    if (data.perimeter && data.perimeter.coordinates && data.perimeter.coordinates[0]) {
+                        // GeoJSON Polygon coordinates are usually [lng, lat]
+                        const coords = data.perimeter.coordinates[0].map((c: any) => ({ lat: c[1], lng: c[0] }));
+                        setCondoPerimeter(coords);
                     }
                 })
                 .catch(err => console.error('Failed to fetch condo details', err));
         }
     }, [selectedCondo]);
 
+    // Listen for Demo Injection Events
+    useEffect(() => {
+        const handleDemoAuth = (e: Event) => {
+            const customEvent = e as CustomEvent<{ method: string }>;
+
+            // Find the most recent delivery waiting for authorization
+            const targetDeliveries = deliveries.filter(d => ['pending_authorization', 'pre_authorized'].includes(d.status || ''));
+
+            if (targetDeliveries.length > 0) {
+                const target = targetDeliveries[0];
+                updateStatus(target.id, {
+                    status: 'authorized',
+                    authorization_method: customEvent.detail.method,
+                    actor_role: 'resident',
+                    authorized_by_resident_name: 'Morador Teste (Demo)'
+                });
+            } else {
+                console.warn("No pending delivery found to authorize");
+            }
+        };
+
+        window.addEventListener('demo-authorize', handleDemoAuth);
+        return () => window.removeEventListener('demo-authorize', handleDemoAuth);
+    }, [deliveries, updateStatus]);
+
     // Filter Logic
     const activeDeliveries = deliveries.filter(d =>
-        ['at_gate', 'approaching', 'pre_authorized'].includes(d.status || '') &&
+        // Active processes are those not yet completed or recently rejected (handled by backend, but we filter out exited/completed just in case)
+        !['completed', 'exited'].includes(d.status || '') &&
         (providerFilter === 'all' || d.provider === providerFilter)
-    );
-    const recentHistory = deliveries.filter(d => ['completed', 'rejected'].includes(d.status || '')).slice(0, 5); // Last 5
+    ).sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()); // Sort newest first
+
+    const recentHistory = deliveries.filter(d => ['completed', 'rejected', 'exited', 'denied'].includes(d.status || '')).slice(0, 5); // Last 5
 
     return (
         <div className="flex h-screen w-full bg-slate-950 text-white overflow-hidden font-sans">
@@ -67,7 +152,24 @@ const Concierge: React.FC = () => {
 
                         {/* COL 1: LIVE MAP (65%) */}
                         <div className="flex-[2] flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm relative overflow-hidden group">
-                            <LiveMap deliveries={deliveries} gates={gates} center={condoCenter} />
+                            <LiveMap
+                                deliveries={deliveries}
+                                gates={gates}
+                                center={condoCenter}
+                                condoPerimeter={condoPerimeter}
+                                isPlacingItem={!!pendingInjection}
+                                onMapClick={handleMapClick}
+                                onMarkerDragEnd={(id, lat, lng) => {
+                                    const deliveryToUpdate = deliveries.find(d => d.id === id);
+                                    if (deliveryToUpdate) {
+                                        updateStatus(id, {
+                                            status: deliveryToUpdate.status,
+                                            driver_lat: lat,
+                                            driver_lng: lng
+                                        });
+                                    }
+                                }}
+                            />
                         </div>
 
                         {/* COL 2: PLANNER / OPERATIONAL (35%) */}
@@ -79,7 +181,7 @@ const Concierge: React.FC = () => {
                                     <div className="flex justify-between items-center">
                                         <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
                                             <div className="w-2.5 h-2.5 bg-yellow-400 rounded-sm rotate-45 animate-pulse" />
-                                            <span>Chegando / Portaria</span>
+                                            <span>Processos Ativos</span>
                                         </h2>
                                         <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-1 rounded-full">{activeDeliveries.length}</span>
                                     </div>
@@ -111,17 +213,18 @@ const Concierge: React.FC = () => {
                                     <AnimatePresence mode="popLayout">
                                         {activeDeliveries.length === 0 && (
                                             <div className="text-center py-10 text-slate-600">
-                                                <p className="text-sm">Ninguém aguardando ou chegando</p>
+                                                <p className="text-sm">Nenhum processo ativo</p>
                                             </div>
                                         )}
                                         {activeDeliveries.map(d => (
-                                            <DeliveryCard
+                                            <ActiveProcessListItem
                                                 key={d.id}
                                                 delivery={d}
-                                                // Show actions to allow entry
-                                                onAuthorize={(id) => updateStatus(id, { status: 'inside', authorization_method: 'manual', actor_role: 'concierge' })}
-                                                onReject={(id) => updateStatus(id, { status: 'rejected', actor_role: 'concierge' })}
-                                                primaryActionLabel={['at_gate', 'pre_authorized'].includes(d.status || '') ? "Liberar Entrada" : "Pré-Autorizar"}
+                                                onRequestWhatsApp={(id) => updateStatus(id, { status: 'pending_authorization', notes: 'whatsapp_requested' })}
+                                                onRequestPush={(id) => updateStatus(id, { status: 'pending_authorization', notes: 'push_requested' })}
+                                                onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
+                                                onAuthorizeManual={(id) => updateStatus(id, { status: 'authorized', actor_role: 'concierge', authorization_method: 'manual' })}
+                                                onRejectManual={(id) => updateStatus(id, { status: 'denied', actor_role: 'concierge', authorization_method: 'manual' })}
                                             />
                                         ))}
                                     </AnimatePresence>
@@ -170,6 +273,16 @@ const Concierge: React.FC = () => {
 
             {/* Background Texture */}
             <div className="absolute inset-0 z-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, #1e293b 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+
+            <ManualAuthorizationModal
+                isOpen={!!phoneModalDeliveryId}
+                onClose={() => setPhoneModalDeliveryId(null)}
+                onSubmit={handlePhoneCallSubmit}
+                deliveryName={activeDeliveries.find(d => d.id === phoneModalDeliveryId)?.driver_snapshot.name || 'Desconhecido'}
+                unitLabel={activeDeliveries.find(d => d.id === phoneModalDeliveryId)?.target_unit_label || 'Desconhecida'}
+            />
+
+            <SalesDemoInjector onRequestInjection={(provider, withBiometrics) => setPendingInjection({ provider, withBiometrics })} />
         </div>
     );
 };

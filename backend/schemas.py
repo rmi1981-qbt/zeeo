@@ -52,7 +52,7 @@ class DeliveryUpdate(BaseModel):
     driver_lng: Optional[float] = None
     eta: Optional[datetime] = None
     # Authorization fields
-    authorization_method: Optional[str] = None  # app_zeeo, whatsapp, phone_call, intercom, pre_authorized, manual
+    authorization_method: Optional[str] = None  # app_zeeo, whatsapp, push, phone_call, intercom, pre_authorized, manual
     actor_id: Optional[str] = None
     actor_name: Optional[str] = None
     actor_role: Optional[str] = None  # concierge, resident, admin, system
@@ -61,6 +61,7 @@ class DeliveryUpdate(BaseModel):
     gate_id: Optional[str] = None
     gate_name: Optional[str] = None
     notes: Optional[str] = None
+    request_channels: Optional[List[str]] = None # Tracks channels used to request auth (e.g. ['whatsapp', 'push'])
 
 class GateInfo(BaseModel):
     id: str
@@ -97,7 +98,7 @@ class DeliveryEventCreate(BaseModel):
     gate_id: Optional[str] = None
     gate_name: Optional[str] = None
     notes: Optional[str] = None
-    metadata: Optional[dict] = None
+    metadata: Optional[dict] = None # Capture things like request_channels, conflicting_responses, etc
 
 class DeliveryEvent(DeliveryEventCreate):
     id: str
@@ -105,6 +106,16 @@ class DeliveryEvent(DeliveryEventCreate):
 
     class Config:
         from_attributes = True
+
+# --- Webhook Schemas ---
+class WebhookPayload(BaseModel):
+    delivery_id: str
+    channel: str # 'whatsapp', 'push', etc.
+    decision: str # 'authorized', 'denied'
+    actor_id: Optional[str] = None
+    actor_name: Optional[str] = None
+    actor_role: Optional[str] = 'resident'
+    notes: Optional[str] = None
 
 # --- Gate Schemas ---
 

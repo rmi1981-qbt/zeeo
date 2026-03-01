@@ -130,6 +130,24 @@ const Header: React.FC = () => {
                 </div>
             </div>
 
+            {/* Center: Main Navigation */}
+            {selectedCondo && (
+                <nav className="hidden lg:flex items-center space-x-1 absolute left-1/2 -translate-x-1/2">
+                    <Link
+                        to="/concierge"
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${window.location.pathname.includes('/concierge') ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}
+                    >
+                        Portaria
+                    </Link>
+                    <Link
+                        to="/history"
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${window.location.pathname.includes('/history') ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}
+                    >
+                        Histórico
+                    </Link>
+                </nav>
+            )}
+
             {/* Right: Actions and Profile */}
             <div className="flex items-center space-x-3 md:space-x-6 shrink-0">
 

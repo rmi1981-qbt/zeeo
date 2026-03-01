@@ -53,10 +53,11 @@ export function useDeliveries(condoId: string) {
     const fetchDeliveries = useCallback(async () => {
         try {
             if (!condoId || condoId === 'mock') return;
-            const data = await deliveryService.getDeliveries(condoId);
+            // For the gatekeeper dashboard, we only want active deliveries
+            const data = await deliveryService.getActiveDeliveries(condoId);
             setDeliveries(data.map(mapApiToUi));
         } catch (error) {
-            console.error("Failed to load deliveries", error);
+            console.error("Failed to load active deliveries", error);
         }
     }, [condoId]);
 
@@ -84,33 +85,43 @@ export function useDeliveries(condoId: string) {
                 },
                 (payload) => {
                     // console.log('Realtime change:', payload);
-                    if (payload.eventType === 'INSERT') {
-                        setDeliveries(prev => [mapApiToUi(payload.new as ApiDelivery), ...prev]);
-                    } else if (payload.eventType === 'UPDATE') {
-                        const newData = payload.new as ApiDelivery;
-                        const oldData = payload.old as ApiDelivery;
+                    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                        const baseData = payload.new as ApiDelivery;
 
-                        setDeliveries(prev => prev.map(d =>
-                            d.id === newData.id ? mapApiToUi(newData) : d
-                        ));
+                        // We fetch the full delivery from API to get parsed driver_lat/lng
+                        // because realtime payload only sends raw WKB driver_location hex
+                        deliveryService.getDelivery(baseData.id).then(newData => {
+                            if (payload.eventType === 'INSERT') {
+                                setDeliveries(prev => {
+                                    const filtered = prev.filter(d => d.id !== newData.id);
+                                    return [mapApiToUi(newData), ...filtered];
+                                });
+                            } else {
+                                const oldData = payload.old as ApiDelivery;
+                                setDeliveries(prev => prev.map(d =>
+                                    d.id === newData.id ? mapApiToUi(newData) : d
+                                ));
 
-                        // Notifications
-                        if ('Notification' in window && Notification.permission === 'granted') {
-                            // Status Change to 'approaching' or 'at_gate'
-                            if (newData.status !== oldData.status) {
-                                if (newData.status === 'approaching') {
-                                    new Notification('Entrega Aproximando', {
-                                        body: `O motorista ${newData.driver_name || ''} está chegando!`,
-                                        icon: '/vite.svg' // Replace with app icon
-                                    });
-                                } else if (newData.status === 'at_gate') {
-                                    new Notification('Motorista no Portão', {
-                                        body: `O motorista ${newData.driver_name || ''} chegou ao portão!`,
-                                        icon: '/vite.svg'
-                                    });
+                                // Notifications
+                                if ('Notification' in window && Notification.permission === 'granted') {
+                                    if (newData.status !== oldData.status) {
+                                        if (newData.status === 'approaching') {
+                                            new Notification('Entrega Aproximando', {
+                                                body: `O motorista ${newData.driver_name || ''} está chegando!`,
+                                                icon: '/vite.svg'
+                                            });
+                                        } else if (newData.status === 'at_gate') {
+                                            new Notification('Motorista no Portão', {
+                                                body: `O motorista ${newData.driver_name || ''} chegou ao portão!`,
+                                                icon: '/vite.svg'
+                                            });
+                                        }
+                                    }
                                 }
                             }
-                        }
+                        }).catch(err => {
+                            console.error("Failed to sync realtime delivery", err);
+                        });
 
                     } else if (payload.eventType === 'DELETE') {
                         setDeliveries(prev => prev.filter(d => d.id !== payload.old.id));
@@ -163,7 +174,16 @@ export function useDeliveries(condoId: string) {
     const updateStatus = useCallback(async (id: string, payload: StatusUpdatePayload) => {
         try {
             // Optimistic Update
-            setDeliveries(prev => prev.map(d => d.id === id ? { ...d, status: payload.status as DeliveryStatus } : d));
+            setDeliveries(prev => prev.map(d => {
+                if (d.id === id) {
+                    const updated = { ...d, status: payload.status as DeliveryStatus };
+                    if (payload.driver_lat !== undefined && payload.driver_lng !== undefined) {
+                        updated.location = { lat: payload.driver_lat, lng: payload.driver_lng };
+                    }
+                    return updated;
+                }
+                return d;
+            }));
 
             if (payload.status === 'inside' && !payload.driver_lat) {
                 const loc = getRandomLocation('inside');
@@ -182,6 +202,7 @@ export function useDeliveries(condoId: string) {
     return {
         deliveries,
         addMockDelivery,
-        updateStatus
+        updateStatus,
+        fetchDeliveries
     };
 }

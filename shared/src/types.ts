@@ -44,10 +44,10 @@ export interface User {
 
 // --- Deliveries & Access ---
 
-export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'authorized' | 'inside' | 'exited' | 'completed' | 'rejected';
+export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'pending_authorization' | 'authorized' | 'denied' | 'conflicting' | 'inside' | 'exited' | 'completed' | 'rejected' | 'superseded';
 export type DeliverySource = 'app_zeeo' | 'webhook_provider';
 export type ProviderName = 'ifood' | 'rappi' | 'uber' | 'mercadolivre' | 'other';
-export type AuthorizationMethod = 'app_zeeo' | 'whatsapp' | 'phone_call' | 'intercom' | 'pre_authorized' | 'manual';
+export type AuthorizationMethod = 'app_zeeo' | 'whatsapp' | 'push' | 'phone_call' | 'intercom' | 'pre_authorized' | 'manual';
 
 export interface DriverSnapshot {
   name: string;
@@ -90,6 +90,7 @@ export interface Delivery {
   authorized_at?: string;
   entered_at?: string;
   exited_at?: string;
+  request_channels?: ('whatsapp' | 'push')[];
 }
 
 export interface DeliveryEvent {

@@ -9,12 +9,42 @@ const MAP_ID = 'DEMO_MAP_ID';
 
 const getProviderIcon = (provider: string = '') => {
     switch (provider.toLowerCase()) {
-        case 'ifood': return <Bike size={14} className="text-white" />;
-        case 'mercadolivre': return <Truck size={14} className="text-white" />;
-        case 'uber': return <Car size={14} className="text-white" />;
-        default: return <MapPin size={14} className="text-white" />;
+        case 'ifood': return <Bike size={16} className="text-white" />;
+        case 'mercadolivre': return <Truck size={16} className="text-slate-900" />;
+        case 'uber':
+        case 'ubereats': return <Car size={16} className="text-white" />;
+        default: return <MapPin size={16} className="text-white" />;
     }
 };
+
+const getProviderColors = (provider: string = '') => {
+    switch (provider.toLowerCase()) {
+        case 'ifood': return { bg: 'bg-red-600', shadow: 'shadow-red-600/50' };
+        case 'mercadolivre': return { bg: 'bg-yellow-400', shadow: 'shadow-yellow-400/50' };
+        case 'uber':
+        case 'ubereats': return { bg: 'bg-black', shadow: 'shadow-black/50' };
+        default: return { bg: 'bg-slate-600', shadow: 'shadow-slate-600/50' };
+    }
+};
+
+const PerimeterPolygon = ({ perimeter }: { perimeter: { lat: number, lng: number }[] }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (!map || perimeter.length === 0) return;
+        const poly = new google.maps.Polygon({
+            paths: perimeter,
+            strokeColor: '#3b82f6',
+            strokeWeight: 2,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.1,
+            map: map,
+            clickable: false
+        });
+        return () => poly.setMap(null);
+    }, [map, perimeter]);
+    return null;
+};
+
 
 export interface Gate {
     id: string;
@@ -28,16 +58,40 @@ interface LiveMapProps {
     deliveries: Delivery[];
     gates?: Gate[];
     center?: { lat: number, lng: number };
+    onMarkerDragEnd?: (deliveryId: string, lat: number, lng: number) => void;
+    onMapClick?: (lat: number, lng: number) => void;
+    condoPerimeter?: { lat: number; lng: number }[];
+    isPlacingItem?: boolean;
 }
 
 // Internal component for each marker to manage its own InfoWindow state
-const DeliveryMarker = ({ delivery }: { delivery: Delivery }) => {
+const DeliveryMarker = ({ delivery, onDragEnd }: { delivery: Delivery, onDragEnd?: (id: string, lat: number, lng: number) => void }) => {
     const [open, setOpen] = useState(false);
     const [markerRef, marker] = useAdvancedMarkerRef();
 
+    const isAuthorized = delivery.status === 'authorized' || delivery.status === 'pre_authorized';
+    const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
+    const isConflict = delivery.status === 'conflicting';
     const isInside = delivery.status === 'inside';
-    const bgColor = isInside ? 'bg-red-500' : 'bg-yellow-500';
-    const shadowColor = isInside ? 'shadow-red-500/50' : 'shadow-yellow-500/50';
+
+    let statusText = 'Aguardando Liberação';
+    let statusLabelClass = 'bg-yellow-100 text-yellow-600 border border-yellow-200';
+
+    if (isInside) {
+        statusText = 'No Condomínio';
+        statusLabelClass = 'bg-purple-100 text-purple-600 border border-purple-200';
+    } else if (isAuthorized) {
+        statusText = 'Autorizado';
+        statusLabelClass = 'bg-emerald-100 text-emerald-600 border border-emerald-200';
+    } else if (isDenied) {
+        statusText = 'Negado';
+        statusLabelClass = 'bg-rose-100 text-rose-600 border border-rose-200';
+    } else if (isConflict) {
+        statusText = 'Conflito de Respostas';
+        statusLabelClass = 'bg-orange-100 text-orange-600 border border-orange-200';
+    }
+
+    const providerStyle = getProviderColors(delivery.provider);
 
     return (
         <>
@@ -46,9 +100,28 @@ const DeliveryMarker = ({ delivery }: { delivery: Delivery }) => {
                 position={{ lat: delivery.location!.lat, lng: delivery.location!.lng }}
                 onClick={() => setOpen(true)}
                 title={delivery.driver_snapshot.name}
+                // @ts-ignore
+                gmpDraggable={!!onDragEnd}
+                draggable={!!onDragEnd}
+                onDragEnd={(e: any) => {
+                    console.log('AdvancedMarker Drag Ended', e, marker);
+                    if (onDragEnd && marker) {
+                        // The event for AdvancedMarker drag doesn't always have latLng natively in react-google-maps types.
+                        // We extract it from marker.position.
+                        const pos = (marker as any).position;
+                        if (pos) {
+                            const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat;
+                            const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng;
+                            console.log('Found Drag Position:', lat, lng);
+                            if (typeof lat === 'number' && typeof lng === 'number') {
+                                onDragEnd(delivery.id, lat, lng);
+                            }
+                        }
+                    }
+                }}
             >
                 <div
-                    className={`p-1.5 rounded-full border-2 border-white shadow-lg ${bgColor} ${shadowColor} transition-transform hover:scale-110 flex items-center justify-center`}
+                    className={`p-2 rounded-full border-2 border-white shadow-lg ${providerStyle.bg} ${providerStyle.shadow} flex items-center justify-center`}
                 >
                     {getProviderIcon(delivery.provider)}
                 </div>
@@ -63,8 +136,8 @@ const DeliveryMarker = ({ delivery }: { delivery: Delivery }) => {
                     <div className="p-1 text-slate-900">
                         <div className="font-bold">{delivery.driver_snapshot.name}</div>
                         <div className="text-xs text-slate-600 mb-1">{delivery.driver_snapshot.plate}</div>
-                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full inline-block ${isInside ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                            {isInside ? 'No Condomínio' : 'Chegando'}
+                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full inline-block ${statusLabelClass}`}>
+                            {statusText}
                         </div>
                     </div>
                 </InfoWindow>
@@ -86,10 +159,11 @@ const MapController = ({ center }: { center: { lat: number, lng: number } }) => 
     return null;
 };
 
-const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 } }) => {
+const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 }, onMarkerDragEnd, onMapClick, isPlacingItem, condoPerimeter }) => {
     // Filter deliveries to show on map (Arriving and Inside)
     const mapDeliveries = deliveries.filter(d =>
-        ['arriving', 'approaching', 'pre_authorized', 'inside'].includes(d.status) && d.location
+        // Show everything that isn't completed or exited
+        !['completed', 'exited'].includes(d.status) && d.location
     );
 
     if (!GOOGLE_MAPS_API_KEY) {
@@ -116,10 +190,26 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                     mapId={MAP_ID}
                     disableDefaultUI={true}
                     gestureHandling={'greedy'}
-                    className="w-full h-full"
+                    className={`w-full h-full ${isPlacingItem ? 'cursor-crosshair' : ''}`}
                     style={{ background: '#0f172a' }} // prevent white flash
+                    onClick={(e) => {
+                        console.log("Map clicked event:", e);
+                        if (isPlacingItem && onMapClick && e.detail.latLng) {
+                            const latLng: any = e.detail.latLng;
+                            const lat = typeof latLng.lat === 'function' ? latLng.lat() : latLng.lat;
+                            const lng = typeof latLng.lng === 'function' ? latLng.lng() : latLng.lng;
+                            if (typeof lat === 'number' && typeof lng === 'number') {
+                                onMapClick(lat, lng);
+                            }
+                        }
+                    }}
                 >
                     <MapController center={center} />
+
+                    {/* Perimeter Polygon */}
+                    {condoPerimeter && condoPerimeter.length > 0 && (
+                        <PerimeterPolygon perimeter={condoPerimeter} />
+                    )}
 
                     {/* Condo Center Marker - Kept as fallback/general location */}
                     <AdvancedMarker position={center} title="Localização do Condomínio">
@@ -145,24 +235,42 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                     ))}
 
                     {mapDeliveries.map(d => (
-                        <DeliveryMarker key={d.id} delivery={d} />
+                        <DeliveryMarker key={d.id} delivery={d} onDragEnd={onMarkerDragEnd} />
                     ))}
                 </Map>
 
                 {/* Overlay Title */}
                 <div className="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 shadow-xl">
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Google Maps Live</div>
-                    <div className="flex items-center space-x-3 text-white text-sm">
-                        <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
-                            <span>Chegando</span>
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status no Mapa</div>
+                    <div className="flex flex-col space-y-1 text-white text-sm">
+                        <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                            <span className="text-[10px]">Autorizado</span>
                         </div>
-                        <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
-                            <span>No Interior</span>
+                        <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]"></div>
+                            <span className="text-[10px]">Aguardando</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></div>
+                            <span className="text-[10px]">Negado</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+                            <span className="text-[10px]">No Interior</span>
                         </div>
                     </div>
                 </div>
+
+                {isPlacingItem ? (
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-blue-600/90 backdrop-blur-md px-6 py-3 rounded-full border border-blue-400/50 text-white text-sm font-bold shadow-2xl animate-pulse">
+                        📍 Clique no mapa para posicionar o entregador
+                    </div>
+                ) : onMarkerDragEnd && (
+                    <div className="absolute bottom-4 left-4 z-10 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/10 text-white/50 text-[10px] uppercase font-bold tracking-widest pointer-events-none">
+                        Mova os ícones para simular o motorista
+                    </div>
+                )}
             </motion.div>
         </APIProvider>
     );

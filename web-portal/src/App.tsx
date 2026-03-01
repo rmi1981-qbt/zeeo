@@ -6,9 +6,9 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import CondoSelection from './pages/dashboard/CondoSelection';
 import CondominiumSettings from './pages/dashboard/CondominiumSettings';
-import DashboardHome from './pages/dashboard/DashboardHome';
 import IntegrationsHub from './pages/dashboard/IntegrationsHub';
 import Concierge from './pages/Concierge';
+import AccessHistory from './pages/AccessHistory';
 import CondoRegistrationWizard from './components/CondoRegistrationWizard';
 import { BugMonitor } from './components/BugMonitor';
 import MainLayout from './layouts/MainLayout';
@@ -31,7 +31,7 @@ function RoleBasedRedirect() {
     if (membership) {
         switch (membership.role) {
             case 'admin':
-                return <Navigate to="/dashboard" replace />;
+                return <Navigate to="/concierge" replace />;
             case 'concierge':
                 return <Navigate to="/concierge" replace />;
             case 'resident':
@@ -39,9 +39,9 @@ function RoleBasedRedirect() {
         }
     }
 
-    // 3. Platform admin with a selected condo → Dashboard (even without explicit membership)
+    // 3. Platform admin with a selected condo → Concierge (even without explicit membership)
     if (profile.is_platform_admin && selectedCondo) {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/concierge" replace />;
     }
 
     // 4. No condo selected or no membership → Condo Selection
@@ -69,8 +69,9 @@ function App() {
                         <Route element={<ProtectedRoute />}>
                             <Route element={<MainLayout />}>
                                 <Route path="/" element={<RoleBasedRedirect />} />
-                                <Route path="/dashboard" element={<DashboardHome />} />
+                                <Route path="/dashboard" element={<Navigate to="/concierge" replace />} />
                                 <Route path="/concierge" element={<Concierge />} />
+                                <Route path="/history" element={<AccessHistory />} />
                                 <Route path="/resident" element={<ResidentDashboard />} />
 
                                 <Route path="/condo-selection" element={<CondoSelection />} />

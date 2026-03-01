@@ -51,6 +51,17 @@ export const deliveryService = {
         return await response.json();
     },
 
+    async getActiveDeliveries(condoId: string): Promise<ApiDelivery[]> {
+        const response = await fetch(`${API_URL}/deliveries/active?condo_id=${condoId}`);
+        if (!response.ok) throw new Error('Failed to fetch active deliveries');
+        return await response.json();
+    },
+    async getDelivery(deliveryId: string): Promise<ApiDelivery> {
+        const response = await fetch(`${API_URL}/deliveries/${deliveryId}`);
+        if (!response.ok) throw new Error('Failed to fetch delivery');
+        return await response.json();
+    },
+
     async createDelivery(data: Omit<ApiDelivery, 'id' | 'created_at' | 'updated_at'>): Promise<ApiDelivery> {
         const response = await fetch(`${API_URL}/deliveries/`, {
             method: 'POST',
@@ -58,6 +69,16 @@ export const deliveryService = {
             body: JSON.stringify(data)
         });
         if (!response.ok) throw new Error('Failed to create delivery');
+        return await response.json();
+    },
+
+    async processWebhook(payload: { delivery_id: string, channel: string, decision: string, actor_id?: string, actor_name?: string }): Promise<ApiDelivery> {
+        const response = await fetch(`${API_URL}/deliveries/webhook`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Failed to process webhook');
         return await response.json();
     },
 
