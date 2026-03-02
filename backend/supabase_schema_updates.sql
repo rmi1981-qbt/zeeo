@@ -1,7 +1,8 @@
 -- Schema updates for Gatekeeper Workflow
 
--- Condominiums: Configure visibility timeout for recent exits
+-- Condominiums: Configure visibility timeout for recent exits and history rules
 ALTER TABLE public.condominiums ADD COLUMN IF NOT EXISTS exit_visibility_timeout_mins INTEGER DEFAULT 5;
+ALTER TABLE public.condominiums ADD COLUMN IF NOT EXISTS history_visibility_hours INTEGER DEFAULT 24;
 
 -- Deliveries: Track channels used for authorization requests (e.g. ['whatsapp', 'push'])
 ALTER TABLE public.deliveries ADD COLUMN IF NOT EXISTS request_channels TEXT[];

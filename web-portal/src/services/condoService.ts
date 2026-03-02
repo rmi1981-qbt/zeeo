@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost:8000'; // Make sure this matches your backend
+const API_URL = 'http://localhost:8002'; // Make sure this matches your backend
 
 export interface Condo {
     id: string;

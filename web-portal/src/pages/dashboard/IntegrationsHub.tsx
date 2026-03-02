@@ -54,7 +54,11 @@ const INTEGRATIONS = [
     }
 ];
 
+import { useAuth } from '../../contexts/AuthContext';
+import { CondominiumWebhookConfig } from '../../components/Integrations/CondominiumWebhookConfig';
+
 const IntegrationsHub: React.FC = () => {
+    const { selectedCondo } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
 
     const filteredIntegrations = INTEGRATIONS.filter(i =>
@@ -105,6 +109,11 @@ const IntegrationsHub: React.FC = () => {
                         />
                     </motion.div>
                 </div>
+
+                {/* Webhook Config Form */}
+                {selectedCondo && (
+                    <CondominiumWebhookConfig condoId={selectedCondo} />
+                )}
 
                 {/* Dashboard Stats Panel (Mock) */}
                 <motion.div

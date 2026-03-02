@@ -44,7 +44,7 @@ export interface User {
 
 // --- Deliveries & Access ---
 
-export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'pending_authorization' | 'authorized' | 'denied' | 'conflicting' | 'inside' | 'exited' | 'completed' | 'rejected' | 'superseded';
+export type DeliveryStatus = 'pre_authorized' | 'arriving' | 'approaching' | 'at_gate' | 'authorized' | 'denied' | 'conflicting' | 'inside' | 'exited' | 'completed' | 'rejected' | 'superseded';
 export type DeliverySource = 'app_zeeo' | 'webhook_provider';
 export type ProviderName = 'ifood' | 'rappi' | 'uber' | 'mercadolivre' | 'other';
 export type AuthorizationMethod = 'app_zeeo' | 'whatsapp' | 'push' | 'phone_call' | 'intercom' | 'pre_authorized' | 'manual';

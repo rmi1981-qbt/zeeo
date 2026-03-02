@@ -16,6 +16,10 @@ type Membership = {
   role: 'admin' | 'resident' | 'concierge';
   status: 'pending' | 'approved' | 'rejected';
   unit_label?: string;
+  condominiums?: {
+    history_visibility_hours?: number;
+    [key: string]: any;
+  };
 };
 
 type AuthContextType = {

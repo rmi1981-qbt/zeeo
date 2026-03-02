@@ -2,7 +2,7 @@ print("🚀 Backend V2.0 - Supabase REST API Mode", flush=True)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.cors import CORSMiddleware
-from routes import condos, deliveries
+from routes import condos, deliveries, hub
 import database  # This initializes Supabase client
 
 app = FastAPI(title="SaFE Backend", version="2.0.0-supabase-rest")
@@ -19,7 +19,8 @@ app.add_middleware(
 # Register routers
 app.include_router(condos.router)
 app.include_router(deliveries.router)
-print("✅ Condos router registered!", flush=True)
+app.include_router(hub.router, prefix="/api/hub", tags=["Integrations Hub"])
+print("✅ Routers registered!", flush=True)
 
 @app.get("/")
 def read_root():

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Phone, UserCheck, UserX, PhoneMissed } from 'lucide-react';
 
 export interface PhoneCallOutcome {
-    status: 'authorized' | 'denied' | 'no_answer';
+    status: 'authorized' | 'rejected' | 'no_answer';
     authorizerName: string;
 }
 
@@ -17,7 +17,7 @@ interface ManualAuthorizationModalProps {
 
 export const ManualAuthorizationModal: React.FC<ManualAuthorizationModalProps> = ({ isOpen, onClose, onSubmit, deliveryName, unitLabel }) => {
     const [authorizerName, setAuthorizerName] = useState('');
-    const [selectedOutcome, setSelectedOutcome] = useState<'authorized' | 'denied' | 'no_answer' | null>(null);
+    const [selectedOutcome, setSelectedOutcome] = useState<'authorized' | 'rejected' | 'no_answer' | null>(null);
 
     const handleSubmit = () => {
         if (!selectedOutcome) return;
@@ -76,8 +76,8 @@ export const ManualAuthorizationModal: React.FC<ManualAuthorizationModalProps> =
                             <span className="text-xs font-bold">Aprovado</span>
                         </button>
                         <button
-                            onClick={() => setSelectedOutcome('denied')}
-                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${selectedOutcome === 'denied' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'}`}
+                            onClick={() => setSelectedOutcome('rejected')}
+                            className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all ${selectedOutcome === 'rejected' ? 'bg-rose-500/20 border-rose-500 text-rose-400' : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'}`}
                         >
                             <UserX size={24} />
                             <span className="text-xs font-bold">Negado</span>

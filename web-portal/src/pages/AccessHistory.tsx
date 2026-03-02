@@ -17,7 +17,7 @@ interface AccessLog {
 }
 
 const AccessHistory: React.FC = () => {
-    const { selectedCondo } = useAuth();
+    const { selectedCondo, memberships, profile } = useAuth();
     const [logs, setLogs] = useState<AccessLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -30,16 +30,29 @@ const AccessHistory: React.FC = () => {
                 // Fetch deliveries that are in a terminal state or have events
                 // For simplicity, we fetch all deliveries for the condo ordered by latest updated
                 // We'll limit to 100 for this view initially
-                const { data, error } = await supabase
+                // Check permissions
+                const currentMembership = memberships.find(m => m.condominium_id === selectedCondo);
+                const isConcierge = currentMembership?.role === 'concierge';
+                const isAdmin = currentMembership?.role === 'admin' || profile?.is_platform_admin;
+
+                let query = supabase
                     .from('deliveries')
                     .select('id, driver_name, platform, unit, status, authorized_method, authorized_by, created_at, updated_at')
                     .eq('condo_id', selectedCondo)
                     .order('updated_at', { ascending: false })
                     .limit(100);
 
+                if (isConcierge && !isAdmin) {
+                    const visibilityHours = currentMembership.condominiums?.history_visibility_hours || 24;
+                    const cutoff = new Date();
+                    cutoff.setHours(cutoff.getHours() - visibilityHours);
+                    query = query.gte('updated_at', cutoff.toISOString());
+                }
+
+                const { data, error } = await query;
                 if (error) throw error;
 
-                setLogs(data.map((d: any) => ({
+                setLogs((data || []).map((d: any) => ({
                     id: d.id,
                     driver_name: d.driver_name || 'Desconhecido',
                     platform: d.platform,
@@ -58,7 +71,7 @@ const AccessHistory: React.FC = () => {
         };
 
         fetchHistory();
-    }, [selectedCondo]);
+    }, [selectedCondo, memberships, profile]);
 
     const filteredLogs = logs.filter(log =>
         log.driver_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -74,8 +87,7 @@ const AccessHistory: React.FC = () => {
             'pending_authorization': 'Aguardando Morador',
             'authorized': 'Autorizado',
             'pre_authorized': 'Pré-autorizado',
-            'denied': 'Negado',
-            'rejected': 'Rejeitado',
+            'rejected': 'Negado',
             'inside': 'Dentro',
             'exited': 'Saiu',
             'completed': 'Finalizado'

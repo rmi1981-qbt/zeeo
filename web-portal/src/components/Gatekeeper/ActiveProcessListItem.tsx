@@ -29,7 +29,7 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onRecover
 }) => {
     // Determine active flags based on status
-    const isPending = delivery.status === 'pending_authorization' || (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by);
+    const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by);
     const isConflict = delivery.status === 'conflicting';
     const isAuthorized = delivery.status === 'authorized' || delivery.status === 'pre_authorized';
     const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
@@ -159,7 +159,7 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                 <div className="mt-3 pt-3 border-t border-slate-800/50 flex justify-between items-center">
                     <span className="text-[10px] text-slate-500">Ações manuais do porteiro</span>
                     <div className="flex gap-2">
-                        <button onClick={() => onRejectManual(delivery.id)} className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-colors">Bloquear</button>
+                        <button onClick={() => onRejectManual(delivery.id)} className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-colors">Negar Acesso</button>
                         <button onClick={() => onAuthorizeManual(delivery.id)} className="px-3 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-xs font-bold transition-colors">Liberar</button>
                     </div>
                 </div>

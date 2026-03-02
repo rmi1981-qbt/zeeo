@@ -111,7 +111,7 @@ class DeliveryEvent(DeliveryEventCreate):
 class WebhookPayload(BaseModel):
     delivery_id: str
     channel: str # 'whatsapp', 'push', etc.
-    decision: str # 'authorized', 'denied'
+    decision: str # 'authorized', 'rejected'
     actor_id: Optional[str] = None
     actor_name: Optional[str] = None
     actor_role: Optional[str] = 'resident'

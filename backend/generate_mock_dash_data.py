@@ -63,7 +63,7 @@ if __name__ == "__main__":
     print(f"Generating mock deliveries for Condo: {condo_id}...\n")
     
     # 1. Pending (Aguardando Liberação)
-    create_delivery(condo_id, "João Silva", "pending_authorization", 0.001, 0.001, ["whatsapp"])
+    create_delivery(condo_id, "João Silva", "at_gate", 0.001, 0.001, ["whatsapp"])
     time.sleep(1)
     
     # 2. Authorized (Autorizado)
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     time.sleep(1)
     
     # 3. Denied (Negado)
-    create_delivery(condo_id, "Pedro Santos", "denied", 0.002, -0.001, ["whatsapp"], "Ana (Moradora)")
+    create_delivery(condo_id, "Pedro Santos", "rejected", 0.002, -0.001, ["whatsapp"], "Ana (Moradora)")
     time.sleep(1)
     
     # 4. Conflicting (Conflito)
