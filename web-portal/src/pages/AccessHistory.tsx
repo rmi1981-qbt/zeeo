@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import Header from '../components/Header';
 import { History, Search, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -97,88 +96,84 @@ const AccessHistory: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-screen bg-slate-950 text-white overflow-hidden">
-            <Header />
-
-            <main className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full">
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-4">
-                        <Link to="/concierge" className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white">
-                            <ArrowLeft size={24} />
-                        </Link>
-                        <div>
-                            <h1 className="text-2xl font-bold flex items-center gap-2">
-                                <History className="text-primary-500" />
-                                Histórico de Acessos
-                            </h1>
-                            <p className="text-slate-400 text-sm">Registro completo de entradas e saídas</p>
-                        </div>
-                    </div>
-
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            <Search size={16} className="text-slate-500" />
-                        </div>
-                        <input
-                            type="text"
-                            placeholder="Buscar por nome, unidade ou status..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary-500 transition-colors w-80 text-white"
-                        />
+        <div className="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto w-full">
+            <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-4">
+                    <Link to="/concierge" className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white">
+                        <ArrowLeft size={24} />
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold flex items-center gap-2">
+                            <History className="text-primary-500" />
+                            Histórico de Acessos
+                        </h1>
+                        <p className="text-slate-400 text-sm">Registro completo de entradas e saídas</p>
                     </div>
                 </div>
 
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800/50 uppercase text-xs font-bold tracking-wider">
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search size={16} className="text-slate-500" />
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Buscar por nome, unidade ou status..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="bg-slate-900 border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-primary-500 transition-colors w-80 text-white"
+                    />
+                </div>
+            </div>
+
+            <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-800/50 uppercase text-xs font-bold tracking-wider">
+                            <tr>
+                                <th className="px-6 py-4">Data/Hora</th>
+                                <th className="px-6 py-4">Unidade</th>
+                                <th className="px-6 py-4">Nome</th>
+                                <th className="px-6 py-4">Plataforma</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Método</th>
+                                <th className="px-6 py-4">Autorizador</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                            {loading ? (
                                 <tr>
-                                    <th className="px-6 py-4">Data/Hora</th>
-                                    <th className="px-6 py-4">Unidade</th>
-                                    <th className="px-6 py-4">Nome</th>
-                                    <th className="px-6 py-4">Plataforma</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Método</th>
-                                    <th className="px-6 py-4">Autorizador</th>
+                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">Caregando histórico...</td>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/50">
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-8 text-center text-slate-500">Caregando histórico...</td>
+                            ) : filteredLogs.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
+                                </tr>
+                            ) : (
+                                filteredLogs.map(log => (
+                                    <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
+                                        <td className="px-6 py-4 text-slate-300 whitespace-nowrap">
+                                            {new Date(log.updated_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                        </td>
+                                        <td className="px-6 py-4 font-bold text-white">{log.target_unit_label}</td>
+                                        <td className="px-6 py-4 text-slate-300">{log.driver_name}</td>
+                                        <td className="px-6 py-4 text-slate-400 capitalize">{log.platform}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${['authorized', 'pre_authorized', 'completed', 'inside', 'exited'].includes(log.status) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                                ['denied', 'rejected'].includes(log.status) ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
+                                                    'bg-slate-800 text-slate-400 border border-slate-700'
+                                                }`}>
+                                                {translateStatus(log.status)}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-400">{translateMethod(log.authorized_method)}</td>
+                                        <td className="px-6 py-4 font-medium text-slate-300">{log.authorized_by || '-'}</td>
                                     </tr>
-                                ) : filteredLogs.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-8 text-center text-slate-500">Nenhum registro encontrado.</td>
-                                    </tr>
-                                ) : (
-                                    filteredLogs.map(log => (
-                                        <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
-                                            <td className="px-6 py-4 text-slate-300 whitespace-nowrap">
-                                                {new Date(log.updated_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-                                            </td>
-                                            <td className="px-6 py-4 font-bold text-white">{log.target_unit_label}</td>
-                                            <td className="px-6 py-4 text-slate-300">{log.driver_name}</td>
-                                            <td className="px-6 py-4 text-slate-400 capitalize">{log.platform}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${['authorized', 'pre_authorized', 'completed', 'inside', 'exited'].includes(log.status) ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                                    ['denied', 'rejected'].includes(log.status) ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' :
-                                                        'bg-slate-800 text-slate-400 border border-slate-700'
-                                                    }`}>
-                                                    {translateStatus(log.status)}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-400">{translateMethod(log.authorized_method)}</td>
-                                            <td className="px-6 py-4 font-medium text-slate-300">{log.authorized_by || '-'}</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
-            </main>
+            </div>
         </div>
     );
 };

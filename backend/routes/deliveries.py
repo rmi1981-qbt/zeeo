@@ -101,8 +101,8 @@ def list_active_deliveries(condo_id: str = Query(..., description="Condo ID to f
         for d in response.data:
             status = d.get('status')
             
-            # If final status, check if it was recently exited/completed
-            if status in ('exited', 'completed', 'rejected', 'superseded'):
+            # If final status, check if it was recently exited/completed/rejected/denied
+            if status in ('exited', 'completed', 'rejected', 'superseded', 'denied'):
                 updated_at_str = d.get('updated_at') or d.get('created_at')
                 # Try to parse standard ISO format handling Z
                 if updated_at_str.endswith('Z'):

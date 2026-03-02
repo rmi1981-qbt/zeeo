@@ -7,7 +7,7 @@ import { condoService } from '../services/condoService';
 import { deliveryService } from '../services/deliveryService';
 import { ActiveProcessListItem } from '../components/Gatekeeper/ActiveProcessListItem';
 import { ManualAuthorizationModal, PhoneCallOutcome } from '../components/Gatekeeper/ManualAuthorizationModal';
-import { History } from 'lucide-react';
+import { History, Search } from 'lucide-react';
 import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
 const Concierge: React.FC = () => {
@@ -15,6 +15,8 @@ const Concierge: React.FC = () => {
     const { deliveries, updateStatus, fetchDeliveries } = useDeliveries(selectedCondo || 'mock');
 
     const [providerFilter, setProviderFilter] = useState<string>('all');
+    const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'trash'>('pending');
+    const [searchQuery, setSearchQuery] = useState('');
     const [gates, setGates] = useState<{ id: string; name: string; lat: number; lng: number; is_main: boolean }[]>([]);
     const [condoCenter, setCondoCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
     const [condoPerimeter, setCondoPerimeter] = useState<{ lat: number; lng: number }[]>([]);
@@ -132,13 +134,37 @@ const Concierge: React.FC = () => {
     }, [deliveries, updateStatus]);
 
     // Filter Logic
-    const activeDeliveries = deliveries.filter(d =>
-        // Active processes are those not yet completed or recently rejected (handled by backend, but we filter out exited/completed just in case)
-        !['completed', 'exited'].includes(d.status || '') &&
-        (providerFilter === 'all' || d.provider === providerFilter)
-    ).sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()); // Sort newest first
+    const filteredDeliveries = deliveries.filter(d => {
+        // Exclude finalized processes (completed or exited)
+        if (['completed', 'exited'].includes(d.status || '')) return false;
 
-    const recentHistory = deliveries.filter(d => ['completed', 'rejected', 'exited', 'denied'].includes(d.status || '')).slice(0, 5); // Last 5
+        // 1. Provider Filter
+        if (providerFilter !== 'all' && d.provider !== providerFilter) return false;
+
+        // 2. Smart Text Filter
+        if (searchQuery.trim() !== '') {
+            const query = searchQuery.toLowerCase();
+            const gateMatch = d.current_gate?.name?.toLowerCase().includes(query) || false;
+            const unitMatch = d.target_unit_label?.toLowerCase().includes(query) || false;
+            const plateMatch = d.driver_snapshot?.plate?.toLowerCase().includes(query) || false;
+            if (!gateMatch && !unitMatch && !plateMatch) return false;
+        }
+
+        // 3. Tab Filter
+        const s = d.status || '';
+        if (activeTab === 'pending') {
+            return ['approaching', 'at_gate', 'pending_authorization', 'created', 'conflicting'].includes(s);
+        } else if (activeTab === 'approved') {
+            return ['authorized', 'pre_authorized', 'inside'].includes(s);
+        } else if (activeTab === 'trash') {
+            // Trash includes denied/rejected things that haven't expired from the backend yet
+            return ['denied', 'rejected'].includes(s);
+        }
+
+        return true;
+    }).sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()); // Sort newest first
+
+    const recentHistory = deliveries.filter(d => ['completed', 'exited'].includes(d.status || '')).slice(0, 5); // Last 5
 
     return (
         <div className="flex h-screen w-full bg-slate-950 text-white overflow-hidden font-sans">
@@ -183,24 +209,55 @@ const Concierge: React.FC = () => {
                                             <div className="w-2.5 h-2.5 bg-yellow-400 rounded-sm rotate-45 animate-pulse" />
                                             <span>Processos Ativos</span>
                                         </h2>
-                                        <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-1 rounded-full">{activeDeliveries.length}</span>
+                                        <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-1 rounded-full">{filteredDeliveries.length}</span>
                                     </div>
 
-                                    {/* Filters */}
+                                    {/* Tabs */}
+                                    <div className="flex bg-slate-950/50 p-1 rounded-lg">
+                                        {[
+                                            { id: 'pending', label: 'Pendentes' },
+                                            { id: 'approved', label: 'Aprovados' },
+                                            { id: 'trash', label: 'Lixeira' }
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setActiveTab(tab.id as 'pending' | 'approved' | 'trash')}
+                                                className={`flex-1 text-center py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === tab.id
+                                                        ? 'bg-slate-800 text-white shadow-sm'
+                                                        : 'text-slate-500 hover:text-slate-300'
+                                                    }`}
+                                            >
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Smart Filter */}
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar unidade, placa ou portaria..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-blue-500/50 transition-colors placeholder:text-slate-600"
+                                        />
+                                    </div>
+
+                                    {/* Quick Provider Filters */}
                                     <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                                         {[
                                             { id: 'all', label: 'Todos' },
                                             { id: 'ifood', label: 'iFood' },
-                                            { id: 'mercadolivre', label: 'MercadoLivre' },
-                                            { id: 'uber', label: 'Uber' },
-                                            { id: 'rappi', label: 'Rappi' }
+                                            { id: 'mercadolivre', label: 'Mercado Livre' },
+                                            { id: 'uber', label: 'Uber' }
                                         ].map(f => (
                                             <button
                                                 key={f.id}
                                                 onClick={() => setProviderFilter(f.id)}
-                                                className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-colors border ${providerFilter === f.id
-                                                    ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/20'
-                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                                className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${providerFilter === f.id
+                                                        ? 'bg-blue-600 border-blue-500 text-white shadow-sm shadow-blue-900/20'
+                                                        : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
                                                     }`}
                                             >
                                                 {f.label}
@@ -211,12 +268,12 @@ const Concierge: React.FC = () => {
 
                                 <div className="p-4 overflow-y-auto space-y-4 flex-1 scrollbar-hide">
                                     <AnimatePresence mode="popLayout">
-                                        {activeDeliveries.length === 0 && (
+                                        {filteredDeliveries.length === 0 && (
                                             <div className="text-center py-10 text-slate-600">
-                                                <p className="text-sm">Nenhum processo ativo</p>
+                                                <p className="text-sm">Nenhum processo {activeTab === 'trash' ? 'na lixeira' : 'encontrado'}</p>
                                             </div>
                                         )}
-                                        {activeDeliveries.map(d => (
+                                        {filteredDeliveries.map(d => (
                                             <ActiveProcessListItem
                                                 key={d.id}
                                                 delivery={d}
@@ -225,6 +282,7 @@ const Concierge: React.FC = () => {
                                                 onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
                                                 onAuthorizeManual={(id) => updateStatus(id, { status: 'authorized', actor_role: 'concierge', authorization_method: 'manual' })}
                                                 onRejectManual={(id) => updateStatus(id, { status: 'denied', actor_role: 'concierge', authorization_method: 'manual' })}
+                                                onRecover={(id) => updateStatus(id, { status: 'pending_authorization', notes: 'recovered_from_trash' })}
                                             />
                                         ))}
                                     </AnimatePresence>
@@ -278,8 +336,8 @@ const Concierge: React.FC = () => {
                 isOpen={!!phoneModalDeliveryId}
                 onClose={() => setPhoneModalDeliveryId(null)}
                 onSubmit={handlePhoneCallSubmit}
-                deliveryName={activeDeliveries.find(d => d.id === phoneModalDeliveryId)?.driver_snapshot.name || 'Desconhecido'}
-                unitLabel={activeDeliveries.find(d => d.id === phoneModalDeliveryId)?.target_unit_label || 'Desconhecida'}
+                deliveryName={filteredDeliveries.find(d => d.id === phoneModalDeliveryId)?.driver_snapshot.name || 'Desconhecido'}
+                unitLabel={filteredDeliveries.find(d => d.id === phoneModalDeliveryId)?.target_unit_label || 'Desconhecida'}
             />
 
             <SalesDemoInjector onRequestInjection={(provider, withBiometrics) => setPendingInjection({ provider, withBiometrics })} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Delivery } from '@zeeo/shared';
 import { motion } from 'framer-motion';
 import { MapPin, Phone, MessageCircle, Bell, Loader2, AlertTriangle } from 'lucide-react';
@@ -16,6 +16,7 @@ interface ActiveProcessListItemProps {
     onPhoneCallClick: (id: string) => void;
     onAuthorizeManual: (id: string) => void;
     onRejectManual: (id: string) => void;
+    onRecover?: (id: string) => void;
 }
 
 export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
@@ -24,7 +25,8 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onRequestPush,
     onPhoneCallClick,
     onAuthorizeManual,
-    onRejectManual
+    onRejectManual,
+    onRecover
 }) => {
     // Determine active flags based on status
     const isPending = delivery.status === 'pending_authorization' || (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by);
@@ -153,13 +155,27 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             )}
 
             {/* Direct Gatekeeper Actions (Emergency/Override) */}
-            <div className="mt-3 pt-3 border-t border-slate-800/50 flex justify-between items-center">
-                <span className="text-[10px] text-slate-500">Ações manuais do porteiro</span>
-                <div className="flex gap-2">
-                    <button onClick={() => onRejectManual(delivery.id)} className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-colors">Bloquear</button>
-                    <button onClick={() => onAuthorizeManual(delivery.id)} className="px-3 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-xs font-bold transition-colors">Liberar</button>
+            {(!isAuthorized && !isDenied) && (
+                <div className="mt-3 pt-3 border-t border-slate-800/50 flex justify-between items-center">
+                    <span className="text-[10px] text-slate-500">Ações manuais do porteiro</span>
+                    <div className="flex gap-2">
+                        <button onClick={() => onRejectManual(delivery.id)} className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-colors">Bloquear</button>
+                        <button onClick={() => onAuthorizeManual(delivery.id)} className="px-3 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-xs font-bold transition-colors">Liberar</button>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* Recover Action for Trash */}
+            {isDenied && onRecover && (
+                <div className="mt-3 border-t border-rose-500/30 pt-3 flex justify-end">
+                    <button
+                        onClick={() => onRecover(delivery.id)}
+                        className="px-4 py-2 rounded bg-rose-500/20 border border-rose-500/50 hover:bg-rose-500 text-rose-300 hover:text-rose-50 text-xs font-bold transition-all shadow-lg"
+                    >
+                        Recuperar Processo
+                    </button>
+                </div>
+            )}
 
         </motion.div>
     );
