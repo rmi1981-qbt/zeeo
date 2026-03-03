@@ -1,7 +1,7 @@
 import React from 'react';
 import { Delivery } from '@zeeo/shared';
 import { motion } from 'framer-motion';
-import { MapPin, Phone, MessageCircle, Bell, Loader2, AlertTriangle } from 'lucide-react';
+import { Phone, MessageCircle, Bell, Loader2, AlertTriangle, MapPinOff, Navigation } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -16,6 +16,7 @@ interface ActiveProcessListItemProps {
     onPhoneCallClick: (id: string) => void;
     onAuthorizeManual: (id: string) => void;
     onRejectManual: (id: string) => void;
+    onExitManual?: (id: string) => void;
     onRecover?: (id: string) => void;
 }
 
@@ -26,13 +27,15 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onPhoneCallClick,
     onAuthorizeManual,
     onRejectManual,
+    onExitManual,
     onRecover
 }) => {
     // Determine active flags based on status
     const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by);
     const isConflict = delivery.status === 'conflicting';
-    const isAuthorized = delivery.status === 'authorized' || delivery.status === 'pre_authorized';
+    const isAuthorized = delivery.status === 'authorized' || delivery.status === 'pre_authorized' || delivery.status === 'inside';
     const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
+    const isExited = delivery.status === 'exited';
 
     const hasWhatsApp = delivery.request_channels?.includes('whatsapp');
     const hasPush = delivery.request_channels?.includes('push');
@@ -49,11 +52,12 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             exit={{ opacity: 0, scale: 0.95 }}
             className={cn(
                 "relative overflow-hidden rounded-xl border p-4 transition-all duration-300",
-                isAuthorized ? "bg-emerald-900/20 border-emerald-500/50" :
-                    isDenied ? "bg-rose-900/20 border-rose-500/50" :
-                        isConflict ? "bg-orange-900/20 border-orange-500/50" :
-                            isPending ? "bg-yellow-900/20 border-yellow-500/50" :
-                                "bg-slate-800/40 border-slate-700 hover:border-slate-600"
+                isExited ? "bg-slate-800/60 border-slate-600/50 opacity-80" :
+                    isAuthorized ? "bg-emerald-900/20 border-emerald-500/50" :
+                        isDenied ? "bg-rose-900/20 border-rose-500/50" :
+                            isConflict ? "bg-orange-900/20 border-orange-500/50" :
+                                isPending ? "bg-yellow-900/20 border-yellow-500/50" :
+                                    "bg-slate-800/40 border-slate-700 hover:border-slate-600"
             )}
         >
             {/* Header: Driver & Unit */}
@@ -77,13 +81,21 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                 </div>
 
                 <div className="flex flex-col items-end">
-                    <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-primary-400 font-bold">
-                        <MapPin size={12} />
-                        <span>{delivery.target_unit_label}</span>
-                    </div>
+                    {delivery.location ? (
+                        <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-primary-400 font-bold">
+                            <Navigation size={12} />
+                            <span>{delivery.target_unit_label}</span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-slate-500 font-bold">
+                            <MapPinOff size={12} />
+                            <span className="text-[10px]">Sem GPS</span>
+                        </div>
+                    )}
                     {/* Status Badge */}
                     <div className="mt-1 flex justify-end">
-                        {isAuthorized && <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Autorizado</span>}
+                        {isExited && <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saída Liberada</span>}
+                        {isAuthorized && !isExited && <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Autorizado</span>}
                         {isDenied && <span className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">Negado</span>}
                         {isConflict && <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider flex items-center gap-1"><AlertTriangle size={10} /> Conflito de Respostas</span>}
                         {isPending && !isConflict && <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Aguardando Morador</span>}
@@ -92,7 +104,7 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             </div>
 
             {/* Quick Actions for Pending / Unresolved */}
-            {(!isAuthorized && !isDenied) && (
+            {(!isAuthorized && !isDenied && !isExited) && (
                 <div className="mt-3 flex gap-2">
                     {/* WhatsApp Button */}
                     <div className="group relative flex-1">
@@ -151,11 +163,22 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                         <Phone size={14} />
                         <span>Ligar</span>
                     </button>
+
+                    {/* Quick Simulator Access */}
+                    {!delivery.location && (
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: delivery.id, provider: delivery.provider } }))}
+                            className="flex-shrink flex items-center justify-center py-2 px-3 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 text-xs font-bold transition-all"
+                            title="Abrir Simulador (Adicionar GPS)"
+                        >
+                            📱
+                        </button>
+                    )}
                 </div>
             )}
 
             {/* Direct Gatekeeper Actions (Emergency/Override) */}
-            {(!isAuthorized && !isDenied) && (
+            {(!isAuthorized && !isDenied && !isExited) && (
                 <div className="mt-3 pt-3 border-t border-slate-800/50 flex justify-between items-center">
                     <span className="text-[10px] text-slate-500">Ações manuais do porteiro</span>
                     <div className="flex gap-2">
@@ -165,14 +188,32 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                 </div>
             )}
 
-            {/* Recover Action for Trash */}
-            {isDenied && onRecover && (
-                <div className="mt-3 border-t border-rose-500/30 pt-3 flex justify-end">
+            {/* Exit Control Action for Authorized Deliveries */}
+            {(isAuthorized && !isExited && onExitManual) && (
+                <div className="mt-3 pt-3 border-t border-emerald-500/30 flex justify-between items-center">
+                    <span className="text-[10px] text-emerald-500/70">Veículo no Condomínio</span>
+                    <button onClick={() => onExitManual(delivery.id)} className="px-4 py-1.5 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white text-slate-300 text-xs font-bold transition-colors">
+                        Liberar Saída
+                    </button>
+                </div>
+            )}
+
+            {/* Recover Action for Trash / Exited */}
+            {(isDenied || isExited) && onRecover && (
+                <div className={cn(
+                    "mt-3 pt-3 flex justify-end border-t",
+                    isDenied ? "border-rose-500/30" : "border-slate-600/30"
+                )}>
                     <button
                         onClick={() => onRecover(delivery.id)}
-                        className="px-4 py-2 rounded bg-rose-500/20 border border-rose-500/50 hover:bg-rose-500 text-rose-300 hover:text-rose-50 text-xs font-bold transition-all shadow-lg"
+                        className={cn(
+                            "px-4 py-2 rounded border text-xs font-bold transition-all shadow-lg",
+                            isDenied
+                                ? "bg-rose-500/20 border-rose-500/50 hover:bg-rose-500 text-rose-300 hover:text-rose-50"
+                                : "bg-slate-800/50 border-slate-600 hover:bg-slate-700 text-slate-400 hover:text-slate-200"
+                        )}
                     >
-                        Recuperar Processo
+                        {isExited ? 'Desfazer Saída' : 'Recuperar Processo'}
                     </button>
                 </div>
             )}

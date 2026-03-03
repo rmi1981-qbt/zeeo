@@ -60,12 +60,13 @@ interface LiveMapProps {
     center?: { lat: number, lng: number };
     onMarkerDragEnd?: (deliveryId: string, lat: number, lng: number) => void;
     onMapClick?: (lat: number, lng: number) => void;
+    onMarkerClick?: (deliveryId: string, provider: string) => void;
     condoPerimeter?: { lat: number; lng: number }[];
     isPlacingItem?: boolean;
 }
 
 // Internal component for each marker to manage its own InfoWindow state
-const DeliveryMarker = ({ delivery, onDragEnd }: { delivery: Delivery, onDragEnd?: (id: string, lat: number, lng: number) => void }) => {
+const DeliveryMarker = ({ delivery, onDragEnd, onMarkerClick }: { delivery: Delivery, onDragEnd?: (id: string, lat: number, lng: number) => void, onMarkerClick?: (id: string, provider: string) => void }) => {
     const [open, setOpen] = useState(false);
     const [markerRef, marker] = useAdvancedMarkerRef();
 
@@ -136,9 +137,17 @@ const DeliveryMarker = ({ delivery, onDragEnd }: { delivery: Delivery, onDragEnd
                     <div className="p-1 text-slate-900">
                         <div className="font-bold">{delivery.driver_snapshot.name}</div>
                         <div className="text-xs text-slate-600 mb-1">{delivery.driver_snapshot.plate}</div>
-                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full inline-block ${statusLabelClass}`}>
+                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full inline-block ${statusLabelClass} mb-2`}>
                             {statusText}
                         </div>
+                        {onMarkerClick && (
+                            <button
+                                onClick={() => onMarkerClick(delivery.id, delivery.provider)}
+                                className="w-full mt-2 bg-slate-900 text-white text-[10px] py-1.5 rounded-md hover:bg-slate-800 transition-colors flex items-center justify-center space-x-1"
+                            >
+                                <span>Abrir App Motorista</span>
+                            </button>
+                        )}
                     </div>
                 </InfoWindow>
             )}
@@ -159,7 +168,7 @@ const MapController = ({ center }: { center: { lat: number, lng: number } }) => 
     return null;
 };
 
-const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 }, onMarkerDragEnd, onMapClick, isPlacingItem, condoPerimeter }) => {
+const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 }, onMarkerDragEnd, onMapClick, onMarkerClick, isPlacingItem, condoPerimeter }) => {
     // Filter deliveries to show on map (Arriving and Inside)
     const mapDeliveries = deliveries.filter(d =>
         // Show everything that isn't completed or exited
@@ -235,7 +244,7 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                     ))}
 
                     {mapDeliveries.map(d => (
-                        <DeliveryMarker key={d.id} delivery={d} onDragEnd={onMarkerDragEnd} />
+                        <DeliveryMarker key={d.id} delivery={d} onDragEnd={onMarkerDragEnd} onMarkerClick={onMarkerClick} />
                     ))}
                 </Map>
 

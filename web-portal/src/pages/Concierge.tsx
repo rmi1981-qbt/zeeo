@@ -6,7 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 import { condoService } from '../services/condoService';
 import { ActiveProcessListItem } from '../components/Gatekeeper/ActiveProcessListItem';
 import { ManualAuthorizationModal, PhoneCallOutcome } from '../components/Gatekeeper/ManualAuthorizationModal';
-import { History, Search } from 'lucide-react';
+import { AlertCircle, Clock, MapPin, Navigation, PhoneCall, ShieldCheck, User, Video, X, Loader2, Map as MapIcon, Link as LinkIcon, AlertTriangle, Key, Search, DoorOpen } from 'lucide-react';
 import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
 const Concierge: React.FC = () => {
@@ -14,7 +14,7 @@ const Concierge: React.FC = () => {
     const { deliveries, updateStatus } = useDeliveries(selectedCondo || 'mock');
 
     const [providerFilter, setProviderFilter] = useState<string>('all');
-    const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'trash'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'saidas' | 'trash'>('pending');
     const [searchQuery, setSearchQuery] = useState('');
     const [gates, setGates] = useState<{ id: string; name: string; lat: number; lng: number; is_main: boolean }[]>([]);
     const [condoCenter, setCondoCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
@@ -42,7 +42,7 @@ const Concierge: React.FC = () => {
     useEffect(() => {
         if (selectedCondo) {
             // Fetch Gates
-            fetch(`http://localhost:8002/condos/${selectedCondo}/gates`)
+            fetch(`http://localhost:8000/condos/${selectedCondo}/gates`)
                 .then(res => res.json())
                 .then(data => {
                     const uiGates = data.map((g: any) => ({
@@ -99,8 +99,10 @@ const Concierge: React.FC = () => {
 
     // Filter Logic
     const filteredDeliveries = deliveries.filter(d => {
-        // Exclude finalized processes (completed or exited)
-        if (['completed', 'exited'].includes(d.status || '')) return false;
+        const s = d.status || '';
+
+        // Exclude completely finalized processes (completed)
+        if (s === 'completed') return false;
 
         // 1. Provider Filter
         if (providerFilter !== 'all' && d.provider !== providerFilter) return false;
@@ -115,7 +117,9 @@ const Concierge: React.FC = () => {
         }
 
         // 3. Tab Filter
-        const s = d.status || '';
+        if (activeTab === 'saidas' && s !== 'exited') return false;
+        if (activeTab !== 'saidas' && s === 'exited') return false;
+
         if (activeTab === 'pending') {
             return ['approaching', 'at_gate', 'created', 'conflicting'].includes(s);
         } else if (activeTab === 'approved') {
@@ -123,12 +127,12 @@ const Concierge: React.FC = () => {
         } else if (activeTab === 'trash') {
             // Trash includes denied/rejected things that haven't expired from the backend yet
             return ['denied', 'rejected'].includes(s);
+        } else if (activeTab === 'saidas') {
+            return s === 'exited';
         }
 
         return true;
     }).sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()); // Sort newest first
-
-    const recentHistory = deliveries.filter(d => ['completed', 'exited'].includes(d.status || '')).slice(0, 5); // Last 5
 
     return (
         <div className="flex h-screen w-full bg-slate-950 text-white overflow-hidden font-sans">
@@ -157,6 +161,9 @@ const Concierge: React.FC = () => {
                                         });
                                     }
                                 }}
+                                onMarkerClick={(id, provider) => {
+                                    window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: id, provider } }));
+                                }}
                             />
                         </div>
 
@@ -179,11 +186,12 @@ const Concierge: React.FC = () => {
                                         {[
                                             { id: 'pending', label: 'Pendentes' },
                                             { id: 'approved', label: 'Aprovados' },
+                                            { id: 'saidas', label: 'Saídas' },
                                             { id: 'trash', label: 'Lixeira' }
                                         ].map(tab => (
                                             <button
                                                 key={tab.id}
-                                                onClick={() => setActiveTab(tab.id as 'pending' | 'approved' | 'trash')}
+                                                onClick={() => setActiveTab(tab.id as any)}
                                                 className={`flex-1 text-center py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === tab.id
                                                     ? 'bg-slate-800 text-white shadow-sm'
                                                     : 'text-slate-500 hover:text-slate-300'
@@ -244,45 +252,18 @@ const Concierge: React.FC = () => {
                                                 onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
                                                 onAuthorizeManual={(id) => updateStatus(id, { status: 'authorized', actor_role: 'concierge', authorization_method: 'manual' })}
                                                 onRejectManual={(id) => updateStatus(id, { status: 'rejected', actor_role: 'concierge', authorization_method: 'manual' })}
-                                                onRecover={(id) => updateStatus(id, { status: 'at_gate', request_channels: ['recovered'], notes: 'recovered_from_trash' })}
+                                                onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
+                                                onRecover={(id) => {
+                                                    const del = deliveries.find(d => d.id === id);
+                                                    if (del && del.status === 'exited') {
+                                                        updateStatus(id, { status: 'inside', actor_role: 'concierge', notes: 'recovered_exit' });
+                                                    } else {
+                                                        updateStatus(id, { status: 'at_gate', request_channels: ['recovered'], notes: 'recovered_from_trash' });
+                                                    }
+                                                }}
                                             />
                                         ))}
                                     </AnimatePresence>
-                                </div>
-                            </div>
-
-                            {/* HISTORY / RECENT EXIT */}
-                            <div className="h-1/3 flex flex-col bg-slate-900/30 rounded-2xl border border-slate-800/30 backdrop-blur-sm overflow-hidden">
-                                <div className="p-3 border-b border-slate-800/30 flex justify-between items-center">
-                                    <h2 className="text-sm font-bold text-slate-400 flex items-center space-x-2">
-                                        <History size={16} />
-                                        <span>Últimas Saídas</span>
-                                    </h2>
-                                </div>
-
-                                <div className="p-3 overflow-y-auto space-y-3 flex-1 scrollbar-hide">
-                                    {recentHistory.map(d => (
-                                        <div key={d.id} className="opacity-70 hover:opacity-100 transition-opacity">
-                                            <div className="flex items-center justify-between p-3 bg-slate-900/40 rounded-lg border border-slate-800/50">
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
-                                                        {d.driver_snapshot.photoUrl ? (
-                                                            <img src={d.driver_snapshot.photoUrl} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-slate-500">{d.driver_snapshot.name[0]}</span>
-                                                        )}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs font-bold text-slate-300">{d.driver_snapshot.name}</div>
-                                                        <div className="text-[10px] text-slate-500">{d.status === 'completed' ? 'Finalizado' : 'Rejeitado'}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-[10px] text-slate-600 font-mono">
-                                                    {new Date(d.updatedAt || '').toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
                                 </div>
                             </div>
 

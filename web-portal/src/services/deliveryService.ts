@@ -1,6 +1,6 @@
 import { DeliveryEvent } from '@zeeo/shared';
 
-const API_URL = 'http://localhost:8002';
+const API_URL = 'http://localhost:8000';
 
 export interface ApiDelivery {
     id: string;

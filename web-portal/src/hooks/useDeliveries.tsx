@@ -98,9 +98,15 @@ export function useDeliveries(condoId: string) {
                                 });
                             } else {
                                 const oldData = payload.old as ApiDelivery;
-                                setDeliveries(prev => prev.map(d =>
-                                    d.id === newData.id ? mapApiToUi(newData) : d
-                                ));
+                                setDeliveries(prev => {
+                                    const exists = prev.some(d => d.id === newData.id);
+                                    if (exists) {
+                                        return prev.map(d => d.id === newData.id ? mapApiToUi(newData) : d);
+                                    } else {
+                                        // If it's an UPDATE but we don't have it yet (e.g. race condition), add it
+                                        return [mapApiToUi(newData), ...prev];
+                                    }
+                                });
 
                                 // Notifications
                                 if ('Notification' in window && Notification.permission === 'granted') {
@@ -130,8 +136,22 @@ export function useDeliveries(condoId: string) {
             )
             .subscribe();
 
+        // Native custom event from the Simulator App for instant feedback
+        const handleLocationUpdate = (e: Event) => {
+            const customEvent = e as CustomEvent<{ deliveryId: string, lat: number, lng: number }>;
+            const { deliveryId, lat, lng } = customEvent.detail;
+            setDeliveries(prev => prev.map(d => {
+                if (d.id === deliveryId) {
+                    return { ...d, location: { lat, lng } };
+                }
+                return d;
+            }));
+        };
+        window.addEventListener('delivery-location-updated', handleLocationUpdate);
+
         return () => {
             subscription.unsubscribe();
+            window.removeEventListener('delivery-location-updated', handleLocationUpdate);
         };
     }, [condoId, fetchDeliveries]);
 

@@ -22,6 +22,8 @@ class ProviderDeliveryPayload(BaseModel):
     driver_photo_url: Optional[str] = None
     vehicle_plate: Optional[str] = None
     eta_mins: Optional[int] = None
+    driver_lat: Optional[float] = None
+    driver_lng: Optional[float] = None
 
 class ProviderLocationPayload(BaseModel):
     driver_lat: float
@@ -57,11 +59,15 @@ async def create_inbound_delivery(
 
     # 2. Insert into the main deliveries table
     
+    # Map 'uber' back to 'ubereats' for the DB check constraint, 
+    # but still allow the API to use 'uber' gracefully
+    db_platform = 'ubereats' if provider == 'uber' else provider
+
     delivery_data = {
         'condo_id': payload.condo_id,
         'unit': payload.target_unit,
         'status': 'approaching',
-        'platform': provider,
+        'platform': db_platform,
         'driver_name': payload.driver_name,
         'driver_photo': payload.driver_photo_url,
         'driver_plate': payload.vehicle_plate,
@@ -69,6 +75,10 @@ async def create_inbound_delivery(
         'created_at': datetime.utcnow().isoformat(),
         'updated_at': datetime.utcnow().isoformat()
     }
+
+    if payload.driver_lat is not None and payload.driver_lng is not None:
+         delivery_data['driver_location'] = f"SRID=4326;POINT({payload.driver_lng} {payload.driver_lat})"
+
 
     try:
         response = supabase.table('deliveries').insert(delivery_data).execute()

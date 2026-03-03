@@ -11,6 +11,19 @@ export const SalesDemoInjector: React.FC = () => {
 
     // Simulator Modal State
     const [simulatorProvider, setSimulatorProvider] = useState<'ifood' | 'mercadolivre' | 'ubereats' | null>(null);
+    const [existingDeliveryId, setExistingDeliveryId] = useState<string | null>(null);
+
+    React.useEffect(() => {
+        const handleOpenSimulator = (e: Event) => {
+            const customEvent = e as CustomEvent<{ deliveryId: string, provider: string }>;
+            const mappedProvider = customEvent.detail.provider === 'uber' ? 'ubereats' : customEvent.detail.provider as any;
+            setSimulatorProvider(mappedProvider);
+            setExistingDeliveryId(customEvent.detail.deliveryId);
+            setIsOpen(false);
+        };
+        window.addEventListener('open-simulator', handleOpenSimulator);
+        return () => window.removeEventListener('open-simulator', handleOpenSimulator);
+    }, []);
 
     if (!selectedCondo) return null;
 
@@ -119,9 +132,10 @@ export const SalesDemoInjector: React.FC = () => {
             {simulatorProvider && (
                 <DriverAppSimulatorModal
                     isOpen={!!simulatorProvider}
-                    onClose={() => setSimulatorProvider(null)}
+                    onClose={() => { setSimulatorProvider(null); setExistingDeliveryId(null); }}
                     provider={simulatorProvider}
                     condoId={selectedCondo}
+                    existingDeliveryId={existingDeliveryId}
                 />
             )}
         </>
