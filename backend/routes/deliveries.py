@@ -283,6 +283,11 @@ def update_delivery_status(delivery_id: str, status_update: schemas.DeliveryUpda
         if status_update.gate_id:
             data['current_gate_id'] = status_update.gate_id
         
+        # Include condo_id so Supabase Realtime doesn't filter out the UPDATE
+        res_condo = supabase.table('deliveries').select('condo_id').eq('id', delivery_id).execute()
+        if res_condo.data:
+            data['condo_id'] = res_condo.data[0]['condo_id']
+
         response = supabase.table('deliveries').update(data).eq('id', delivery_id).execute()
         
         if not response.data:

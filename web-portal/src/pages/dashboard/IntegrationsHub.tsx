@@ -56,10 +56,12 @@ const INTEGRATIONS = [
 
 import { useAuth } from '../../contexts/AuthContext';
 import { CondominiumWebhookConfig } from '../../components/Integrations/CondominiumWebhookConfig';
+import { ApiDocumentationModal } from '../../components/Integrations/ApiDocumentationModal';
 
 const IntegrationsHub: React.FC = () => {
     const { selectedCondo } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
+    const [isApiDocOpen, setIsApiDocOpen] = useState(false);
 
     const filteredIntegrations = INTEGRATIONS.filter(i =>
         i.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -105,8 +107,15 @@ const IntegrationsHub: React.FC = () => {
                             placeholder="Buscar integrações..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 backdrop-blur-sm transition-all"
+                            className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl py-3 pl-12 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 backdrop-blur-sm transition-all mb-4"
                         />
+
+                        <button
+                            onClick={() => setIsApiDocOpen(true)}
+                            className="w-full py-3 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-blue-500/30 text-slate-300 hover:text-white rounded-xl transition-all font-semibold flex items-center justify-center gap-2"
+                        >
+                            Ver Documentação API
+                        </button>
                     </motion.div>
                 </div>
 
@@ -235,6 +244,12 @@ const IntegrationsHub: React.FC = () => {
                     ))}
                 </div>
             </div>
+
+            {/* API Documentation Modal */}
+            <ApiDocumentationModal
+                isOpen={isApiDocOpen}
+                onClose={() => setIsApiDocOpen(false)}
+            />
         </div>
     );
 };

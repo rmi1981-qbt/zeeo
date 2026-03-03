@@ -40,9 +40,9 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     const hasWhatsApp = delivery.request_channels?.includes('whatsapp');
     const hasPush = delivery.request_channels?.includes('push');
 
-    // Assume integrations are disabled for MVP default as per spec, require tooltip
-    const isWhatsAppConfigured = false;
-    const isPushConfigured = false;
+    // Enable integrations for Simulator / Sales Demo
+    const isWhatsAppConfigured = true;
+    const isPushConfigured = true;
 
     return (
         <motion.div

@@ -6,6 +6,8 @@ import { AnimatePresence } from 'framer-motion';
 import { condoService } from '../services/condoService';
 import { ActiveProcessListItem } from '../components/Gatekeeper/ActiveProcessListItem';
 import { ManualAuthorizationModal, PhoneCallOutcome } from '../components/Gatekeeper/ManualAuthorizationModal';
+import { WhatsAppSimulatorModal } from '../components/Gatekeeper/WhatsAppSimulatorModal';
+import { PushAppSimulatorModal } from '../components/Gatekeeper/PushAppSimulatorModal';
 import { AlertCircle, Clock, MapPin, Navigation, PhoneCall, ShieldCheck, User, Video, X, Loader2, Map as MapIcon, Link as LinkIcon, AlertTriangle, Key, Search, DoorOpen } from 'lucide-react';
 import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
@@ -22,6 +24,8 @@ const Concierge: React.FC = () => {
 
     // Modal state
     const [phoneModalDeliveryId, setPhoneModalDeliveryId] = useState<string | null>(null);
+    const [whatsappModalDeliveryId, setWhatsappModalDeliveryId] = useState<string | null>(null);
+    const [pushModalDeliveryId, setPushModalDeliveryId] = useState<string | null>(null);
 
     const handlePhoneCallSubmit = async (outcome: PhoneCallOutcome) => {
         if (!phoneModalDeliveryId) return;
@@ -247,8 +251,14 @@ const Concierge: React.FC = () => {
                                             <ActiveProcessListItem
                                                 key={d.id}
                                                 delivery={d}
-                                                onRequestWhatsApp={(id) => updateStatus(id, { status: 'at_gate', request_channels: ['whatsapp'], notes: 'whatsapp_requested' })}
-                                                onRequestPush={(id) => updateStatus(id, { status: 'at_gate', request_channels: ['push'], notes: 'push_requested' })}
+                                                onRequestWhatsApp={(id) => {
+                                                    updateStatus(id, { status: 'at_gate', request_channels: ['whatsapp'], notes: 'whatsapp_requested' });
+                                                    setWhatsappModalDeliveryId(id);
+                                                }}
+                                                onRequestPush={(id) => {
+                                                    updateStatus(id, { status: 'at_gate', request_channels: ['push'], notes: 'push_requested' });
+                                                    setPushModalDeliveryId(id);
+                                                }}
                                                 onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
                                                 onAuthorizeManual={(id) => updateStatus(id, { status: 'authorized', actor_role: 'concierge', authorization_method: 'manual' })}
                                                 onRejectManual={(id) => updateStatus(id, { status: 'rejected', actor_role: 'concierge', authorization_method: 'manual' })}
@@ -279,8 +289,20 @@ const Concierge: React.FC = () => {
                 isOpen={!!phoneModalDeliveryId}
                 onClose={() => setPhoneModalDeliveryId(null)}
                 onSubmit={handlePhoneCallSubmit}
-                deliveryName={filteredDeliveries.find(d => d.id === phoneModalDeliveryId)?.driver_snapshot.name || 'Desconhecido'}
-                unitLabel={filteredDeliveries.find(d => d.id === phoneModalDeliveryId)?.target_unit_label || 'Desconhecida'}
+                deliveryName={deliveries.find(d => d.id === phoneModalDeliveryId)?.driver_snapshot.name || 'Desconhecido'}
+                unitLabel={deliveries.find(d => d.id === phoneModalDeliveryId)?.target_unit_label || 'Desconhecida'}
+            />
+
+            <WhatsAppSimulatorModal
+                isOpen={!!whatsappModalDeliveryId}
+                onClose={() => setWhatsappModalDeliveryId(null)}
+                delivery={deliveries.find(d => d.id === whatsappModalDeliveryId) || null}
+            />
+
+            <PushAppSimulatorModal
+                isOpen={!!pushModalDeliveryId}
+                onClose={() => setPushModalDeliveryId(null)}
+                delivery={deliveries.find(d => d.id === pushModalDeliveryId) || null}
             />
 
             {/* New Flow: Sales Demo Injector opens simulator modal directly */}

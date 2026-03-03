@@ -195,13 +195,27 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
             // Handle pre-auth if checked
             if (simulatePreAuth) {
                 try {
-                    await deliveryService.processWebhook({
-                        delivery_id: newDeliveryId,
-                        channel: 'app_zeeo',
-                        decision: 'pre_authorized',
-                        actor_name: 'Simulador'
+                    const authResponse = await fetch(`http://localhost:8000/api/hub/webhook/approval`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-api-key': apiKey // Using the provider's API key to simulate an authorized third-party
+                        },
+                        body: JSON.stringify({
+                            delivery_id: newDeliveryId,
+                            decision: 'authorized',
+                            channel: 'app_zeeo',
+                            actor_id: 'Simulador',
+                            notes: 'Pré-autorizado via Simulador'
+                        })
                     });
-                    setStatus('pre_authorized');
+
+                    if (!authResponse.ok) {
+                        const errData = await authResponse.json();
+                        throw new Error(errData.detail || 'Failed to authorize delivery via Webhook');
+                    }
+
+                    setStatus('authorized');
                 } catch (e) {
                     console.error("Failed to simulate pre-auth:", e);
                 }
@@ -211,6 +225,40 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
 
         } catch (err: any) {
             alert("Erro ao iniciar corrida: " + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSimulatePreAuth = async () => {
+        if (!deliveryId) return;
+        setLoading(true);
+        try {
+            const apiKey = PROVIDER_API_KEYS[provider];
+            const authResponse = await fetch(`http://localhost:8000/api/hub/webhook/approval`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey
+                },
+                body: JSON.stringify({
+                    delivery_id: deliveryId,
+                    decision: 'authorized',
+                    channel: 'app_zeeo',
+                    actor_id: 'Simulador',
+                    notes: 'Pré-autorização via Simulador (Atrasada)'
+                })
+            });
+
+            if (!authResponse.ok) {
+                const errData = await authResponse.json();
+                throw new Error(errData.detail || 'Failed to authorize delivery via Webhook');
+            }
+
+            setStatus('authorized');
+        } catch (e: any) {
+            console.error("Failed to simulate pre-auth:", e);
+            alert("Erro ao simular pré-autorização: " + e.message);
         } finally {
             setLoading(false);
         }
@@ -423,6 +471,17 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                                     <Navigation size={20} className={loading ? 'animate-spin' : ''} />
                                     {loading ? 'Enviando API...' : 'Atualizar Localização'}
                                 </button>
+
+                                {['created', 'driver_assigned', 'approaching', 'at_gate'].includes(status) && (
+                                    <button
+                                        onClick={handleSimulatePreAuth}
+                                        disabled={loading}
+                                        className="w-full mt-4 bg-white text-slate-700 border-2 border-slate-300 font-bold text-lg py-4 rounded-2xl active:scale-95 transition-all flex justify-center items-center gap-2 shadow-sm"
+                                    >
+                                        <CheckCircle size={20} className={loading ? 'animate-pulse' : 'text-emerald-500'} />
+                                        Disparar Pré-Autorização
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
