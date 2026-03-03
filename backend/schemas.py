@@ -29,6 +29,32 @@ class Condo(CondoBase):
     class Config:
         from_attributes = True
 
+# --- Unit & Resident Schemas ---
+
+class UnitBase(BaseModel):
+    condo_id: str
+    label: str # ex: "Apto 101", "Casa 5"
+
+class UnitCreate(UnitBase):
+    pass
+
+class Unit(UnitBase):
+    id: str
+    created_at: datetime
+
+class ResidentBase(BaseModel):
+    unit_id: str
+    name: str
+    phone_hash: Optional[str] = None
+    document_hash: Optional[str] = None
+
+class ResidentCreate(ResidentBase):
+    pass
+
+class Resident(ResidentBase):
+    id: str
+    created_at: datetime
+
 # --- Delivery Schemas ---
 
 class DeliveryBase(BaseModel):
@@ -78,6 +104,8 @@ class Delivery(DeliveryBase):
     authorized_at: Optional[datetime] = None
     entered_at: Optional[datetime] = None
     exited_at: Optional[datetime] = None
+    qr_code_token: Optional[str] = None
+    qr_code_expires_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -117,6 +145,10 @@ class WebhookPayload(BaseModel):
     actor_role: Optional[str] = 'resident'
     notes: Optional[str] = None
 
+class QRCheckInPayload(BaseModel):
+    condo_id: str
+    qr_code_token: str
+    
 # --- Gate Schemas ---
 
 class GateBase(BaseModel):

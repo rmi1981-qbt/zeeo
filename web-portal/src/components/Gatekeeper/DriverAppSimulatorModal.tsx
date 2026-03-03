@@ -65,6 +65,7 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
     const [step, setStep] = useState<'setup' | 'active'>('setup');
     const [deliveryId, setDeliveryId] = useState<string | null>(null);
     const [status, setStatus] = useState<string>('N/A');
+    const [qrCodeToken, setQrCodeToken] = useState<string | null>(null);
 
     // Form fields
     const [driverName, setDriverName] = useState(generateRandomName());
@@ -105,6 +106,9 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                     setVehiclePlate(data.driver_plate || '');
                     setTargetUnit(data.unit || '');
                     setSelectedCondoId(data.condo_id);
+                    if (data.qr_code_token) {
+                        setQrCodeToken(data.qr_code_token);
+                    }
 
                     if (data.driver_lat && data.driver_lng) {
                         setCurrentLocation({ lat: data.driver_lat, lng: data.driver_lng });
@@ -134,7 +138,9 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
     useEffect(() => {
         if (!deliveryId) return;
 
-        const channel = supabase.channel(`driver-sim-${deliveryId}`)
+        const uniqueChannelName = `delivery_${deliveryId}_${Math.random().toString(36).substring(7)}`;
+        const channel = supabase
+            .channel(uniqueChannelName)
             .on(
                 'postgres_changes',
                 {
@@ -146,6 +152,11 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                 (payload) => {
                     const newStatus = payload.new.status;
                     setStatus(newStatus);
+                    if (payload.new.qr_code_token) {
+                        setQrCodeToken(payload.new.qr_code_token);
+                    } else if (newStatus === 'inside') {
+                        setQrCodeToken(null);
+                    }
                 }
             )
             .subscribe();
@@ -203,10 +214,11 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                         },
                         body: JSON.stringify({
                             delivery_id: newDeliveryId,
-                            decision: 'authorized',
+                            decision: 'pre_authorized',
                             channel: 'app_zeeo',
                             actor_id: 'Simulador',
-                            notes: 'Pré-autorizado via Simulador'
+                            notes: 'Pré-autorizado via Zero-Knowledge Match',
+                            phone_hash: 'a869177964cc68954ffec997bbad30769f8a5a6fdc60f296ddbc60b9347dc416'
                         })
                     });
 
@@ -243,10 +255,11 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                 },
                 body: JSON.stringify({
                     delivery_id: deliveryId,
-                    decision: 'authorized',
+                    decision: 'pre_authorized',
                     channel: 'app_zeeo',
                     actor_id: 'Simulador',
-                    notes: 'Pré-autorização via Simulador (Atrasada)'
+                    notes: 'Pré-autorização Zero-Knowledge (Atrasada)',
+                    phone_hash: 'a869177964cc68954ffec997bbad30769f8a5a6fdc60f296ddbc60b9347dc416'
                 })
             });
 
@@ -462,6 +475,20 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                                         </span>
                                     </div>
                                 </div>
+
+                                {/* QR Code Display */}
+                                {qrCodeToken && status === 'authorized' && (
+                                    <div className="mb-6 p-6 bg-slate-800 rounded-3xl text-center shadow-lg relative overflow-hidden">
+                                        {/* decorative scanning line */}
+                                        <div className="absolute inset-x-0 h-0.5 bg-emerald-400/50 shadow-[0_0_10px_theme(colors.emerald.400)] top-1/2 -translate-y-1/2 animate-[scan_2s_ease-in-out_infinite_alternate]"></div>
+
+                                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Token de Acesso</p>
+                                        <div className="bg-white px-6 py-4 rounded-xl inline-block mx-auto mb-2 relative z-10">
+                                            <span className="text-4xl font-black text-slate-800 tracking-[0.2em] font-mono">{qrCodeToken}</span>
+                                        </div>
+                                        <p className="text-slate-300 text-sm">Mostre na portaria ou escaneie o leitor</p>
+                                    </div>
+                                )}
 
                                 <button
                                     onClick={handleUpdateLocation}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, CheckCircle2, Code2, Terminal, BookOpen, Send } from 'lucide-react';
+import { X, Copy, CheckCircle2, Code2, Terminal, BookOpen } from 'lucide-react';
 
 interface ApiDocumentationModalProps {
     isOpen: boolean;
@@ -10,7 +10,7 @@ interface ApiDocumentationModalProps {
 
 export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ isOpen, onClose, hubProviderKey = '<SUA_API_KEY>' }) => {
     const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
-    const [activeEndpoint, setActiveEndpoint] = useState<'create_delivery' | 'send_approval'>('send_approval');
+    const [activeEndpoint, setActiveEndpoint] = useState<'create_delivery' | 'send_approval' | 'check_in_qr' | 'update_location'>('send_approval');
 
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
@@ -61,6 +61,40 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
     "condo_id": "123e4567-e89b-12d3",
     "target_unit": "A-12",
     "driver_name": "João Silva"
+  }'`
+        },
+        'update_location': {
+            title: 'Atualizar Localização (GPS)',
+            method: 'POST',
+            path: '/hub/inbound/{provider}/location/{delivery_id}',
+            desc: 'Atualiza em tempo real a posição geográfica do entregador. Permite cálculo de proximidade e alertas para a portaria.',
+            payload: `{
+  "driver_lat": -23.5510,
+  "driver_lng": -46.6340
+}`,
+            curl: `curl -X POST https://api.zeeo.com.br/hub/inbound/meu_app/location/123e4567-e89b-12d3 \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${hubProviderKey}" \\
+  -d '{
+    "driver_lat": -23.5510,
+    "driver_lng": -46.6340
+  }'`
+        },
+        'check_in_qr': {
+            title: 'Validação de QR Code (Check-in)',
+            method: 'POST',
+            path: '/hub/check-in/qr',
+            desc: 'Aprova a entrada física de um entregador ao ler o QR Code ou digitar o Token gerado pelo app Zeeo na portaria. Converte automaticamente a entrega do status "authorized" para "inside".',
+            payload: `{
+  "condo_id": "uuid-do-condominio",
+  "qr_code_token": "XB9PQ2"
+}`,
+            curl: `curl -X POST https://api.zeeo.com.br/hub/check-in/qr \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${hubProviderKey}" \\
+  -d '{
+    "condo_id": "123e4567-e89b-12d3",
+    "qr_code_token": "XB9PQ2"
   }'`
         }
     };
@@ -130,6 +164,28 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
                                     </div>
                                     <div className="font-semibold text-sm">Injetar Entrega</div>
                                     <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/inbound...</div>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveEndpoint('update_location')}
+                                    className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'update_location' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                    </div>
+                                    <div className="font-semibold text-sm">Atualizar GPS</div>
+                                    <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/inbound...</div>
+                                </button>
+
+                                <button
+                                    onClick={() => setActiveEndpoint('check_in_qr')}
+                                    className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'check_in_qr' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                    </div>
+                                    <div className="font-semibold text-sm">Validar QR Code</div>
+                                    <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/check-in/qr</div>
                                 </button>
                             </div>
 

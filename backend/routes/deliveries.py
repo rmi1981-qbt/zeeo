@@ -272,6 +272,12 @@ def update_delivery_status(delivery_id: str, status_update: schemas.DeliveryUpda
             data['authorized_by'] = status_update.actor_id
             data['authorized_method'] = status_update.authorization_method
             data['authorized_at'] = datetime.utcnow().isoformat()
+            
+        if new_status == 'authorized':
+            from utils.delivery_helpers import generate_qr_token
+            from datetime import timedelta
+            data['qr_code_token'] = generate_qr_token()
+            data['qr_code_expires_at'] = (datetime.utcnow() + timedelta(hours=2)).isoformat()
         
         if new_status == 'inside':
             data['entered_at'] = datetime.utcnow().isoformat()

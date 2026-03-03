@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 from supabase import create_client, Client
 import json
+import schemas
 from utils.delivery_helpers import generate_zeeo_code, check_gate_proximity
 
 router = APIRouter()
@@ -31,10 +32,12 @@ class ProviderLocationPayload(BaseModel):
 
 class ProviderApprovalPayload(BaseModel):
     delivery_id: str
-    decision: str  # 'authorized' or 'denied'
-    actor_id: Optional[str] = None
-    channel: str   # 'whatsapp', 'app_condominio', etc.
+    decision: str # authorized or denied
+    channel: str # app_zeeo, whatsapp, push, ifood_app
+    actor_id: str # (e.g., resident ID, driver ID, or generic string)
     notes: Optional[str] = None
+    phone_hash: Optional[str] = None
+    document_hash: Optional[str] = None
 
 
 async def verify_provider_api_key(x_api_key: str = Header(...)):
@@ -157,6 +160,65 @@ async def update_inbound_location(
     return {"status": "success", "message": "Location updated via Hub"}
 
 
+import asyncio
+
+async def perform_identity_matching(delivery_id: str, condo_id: str, channel: str, phone_hash: Optional[str], document_hash: Optional[str]):
+    """Background task to match a pre-authorized delivery against resident Identity Hashes."""
+    if not phone_hash and not document_hash:
+        return # Nothing to match
+        
+    try:
+        # Match using phone or document hash directly on the condo's units
+        # Join residents with units to filter by condo_id
+        match_query = supabase.table('residents').select('id, name, unit_id, units!inner(condo_id, label)').eq('units.condo_id', condo_id)
+        
+        if phone_hash:
+            match_query = match_query.eq('phone_hash', phone_hash)
+        elif document_hash:
+            match_query = match_query.eq('document_hash', document_hash)
+            
+        res = match_query.execute()
+        
+        if res.data and len(res.data) > 0:
+            resident = res.data[0]
+            print(f"✅ Zero-Knowledge Match Success! Resident {resident['name']} ({resident['units']['label']}) authorized delivery.")
+            
+            from utils.delivery_helpers import generate_qr_token
+            from datetime import timedelta
+            qr_token = generate_qr_token()
+            qr_expiry = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+            
+            update_data = {
+                'status': 'authorized',
+                'authorized_method': channel,
+                'authorized_by': resident['id'],
+                'authorized_at': datetime.utcnow().isoformat(),
+                'updated_at': datetime.utcnow().isoformat(),
+                'condo_id': condo_id,
+                'qr_code_token': qr_token,
+                'qr_code_expires_at': qr_expiry
+            }
+            supabase.table('deliveries').update(update_data).eq('id', delivery_id).execute()
+            
+            from utils.delivery_helpers import log_delivery_event
+            log_delivery_event(
+                delivery_id=delivery_id,
+                condo_id=condo_id,
+                event_type='authorized',
+                metadata={
+                    'trigger': 'zero_knowledge_match',
+                    'resident_id': resident['id'],
+                    'resident_name': resident['name'],
+                    'unit_label': resident['units']['label']
+                }
+            )
+        else:
+            print(f"⚠️ Zero-Knowledge Match Failed: Hash not found in condo {condo_id}")
+            # Do not change status. Leave it as pre_authorized.
+            
+    except Exception as e:
+        print(f"❌ Error in perform_identity_matching: {str(e)}")
+
 @router.post("/webhook/approval")
 async def receive_provider_approval(
     payload: ProviderApprovalPayload,
@@ -164,10 +226,11 @@ async def receive_provider_approval(
 ):
     """
     Standard webhook for external integrations (WhatsApp bots, Condo Apps, Intercoms) 
-    to send resident approvals or denials to SaFE.
+    to send resident approvals or denials to SaFE. 
+    It supports Zero-Knowledge matching for pre-authorizations.
     """
-    if payload.decision not in ('authorized', 'denied'):
-        raise HTTPException(status_code=400, detail="Decision must be 'authorized' or 'denied'")
+    if payload.decision not in ('authorized', 'denied', 'pre_authorized'):
+        raise HTTPException(status_code=400, detail="Decision must be 'authorized', 'denied' or 'pre_authorized'")
 
     try:
         # Fetch current delivery
@@ -180,7 +243,7 @@ async def receive_provider_approval(
         
         # Conflict logic: first response wins
         conflict = False
-        new_status = 'rejected' if payload.decision == 'denied' else 'authorized'
+        new_status = 'rejected' if payload.decision == 'denied' else ('pre_authorized' if payload.decision == 'pre_authorized' else 'authorized')
         
         if current_status in ('authorized', 'denied', 'rejected'):
             if current_status != new_status:
@@ -198,7 +261,13 @@ async def receive_provider_approval(
         if not conflict and current_status not in ('authorized', 'denied', 'rejected'):
             update_data['status'] = new_status
             update_data['authorized_method'] = payload.channel
-            update_data['authorized_at'] = datetime.utcnow().isoformat()
+            
+            if new_status == 'authorized':
+                 update_data['authorized_at'] = datetime.utcnow().isoformat()
+                 from utils.delivery_helpers import generate_qr_token
+                 from datetime import timedelta
+                 update_data['qr_code_token'] = generate_qr_token()
+                 update_data['qr_code_expires_at'] = (datetime.utcnow() + timedelta(hours=2)).isoformat()
             
             # authorized_by must be a UUID in the DB. If it's a generic string ("Morador"), skip it for the deliveries table
             if payload.actor_id:
@@ -239,9 +308,20 @@ async def receive_provider_approval(
             metadata=event_metadata
         )
         
+        
+        # Fire Background Matcher if Pre-Authorized and Hashes are provided
+        if not conflict and new_status == 'pre_authorized' and (payload.phone_hash or payload.document_hash):
+            asyncio.create_task(perform_identity_matching(
+                 delivery_id=payload.delivery_id, 
+                 condo_id=d['condo_id'], 
+                 channel=payload.channel,
+                 phone_hash=payload.phone_hash, 
+                 document_hash=payload.document_hash
+            ))
+        
         return {
              "status": "success", 
-             "delivery_status": update_resp.data[0]['status'],
+             "delivery_status": new_status,
              "conflict": conflict
         }
     except Exception as e:
@@ -249,3 +329,68 @@ async def receive_provider_approval(
         err_msg = traceback.format_exc()
         print("WEBHOOK ERROR:", err_msg, flush=True)
         raise HTTPException(status_code=500, detail=str(e) + " | " + err_msg)
+
+@router.post("/check-in/qr")
+async def check_in_qr(
+    payload: schemas.QRCheckInPayload,
+    provider_info: dict = Depends(verify_provider_api_key)
+):
+    """
+    Validates a QR Code OTP scanned by the Portaria or App to allow check-in.
+    """
+    try:
+        # Look for active token
+        res = supabase.table('deliveries').select('*')\
+            .eq('qr_code_token', payload.qr_code_token)\
+            .eq('condo_id', payload.condo_id)\
+            .eq('status', 'authorized')\
+            .execute()
+            
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Invalid, expired, or unused Token.")
+            
+        delivery = res.data[0]
+        
+        # Check Expiration
+        expiration_str = delivery.get('qr_code_expires_at')
+        if not expiration_str:
+            raise HTTPException(status_code=400, detail="Token has no expiration data.")
+            
+        expiration = datetime.fromisoformat(expiration_str.replace("Z", "+00:00"))
+        
+        # We need utcnow with timezone support for comparison
+        from datetime import timezone
+        if expiration < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="Token Expired.")
+            
+        # Success. Check-in!
+        update_data = {
+            'status': 'inside',
+            'entered_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat(),
+            'qr_code_token': None, # Burn token
+            'qr_code_expires_at': None
+        }
+        
+        supabase.table('deliveries').update(update_data).eq('id', delivery['id']).execute()
+        
+        from utils.delivery_helpers import log_delivery_event
+        log_delivery_event(
+            delivery_id=delivery['id'],
+            condo_id=payload.condo_id,
+            event_type='inside',
+            metadata={
+                'method': 'qr_code_otp',
+                'provider': provider_info['name']
+            }
+        )
+        
+        return {"status": "success", "message": "Delivery successfully checked in.", "delivery_id": delivery['id']}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print("QR CHECK-IN ERROR:", err_msg, flush=True)
+        raise HTTPException(status_code=500, detail=str(e))

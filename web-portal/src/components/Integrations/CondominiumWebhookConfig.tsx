@@ -146,6 +146,41 @@ export const CondominiumWebhookConfig: React.FC<CondominiumWebhookConfigProps> =
         >
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-[80px] pointer-events-none" />
 
+            <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+                        <Key className="text-blue-400" />
+                        Chaves de Acesso (Inbound API)
+                    </h2>
+                    <p className="text-slate-400 max-w-2xl text-sm">
+                        Utilize esta Chave de API para autenticar as requisições do App do Condomínio (ou bots parceiros) enviadas para o Zeeo.
+                    </p>
+                </div>
+            </div>
+
+            <div className="mb-10 bg-slate-900/60 p-5 rounded-2xl border border-blue-500/20">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                    API Key (Header: x-api-key)
+                </label>
+                <div className="flex gap-2">
+                    <input
+                        type="text"
+                        readOnly
+                        value="condominio_sim_key_123"
+                        className="w-full bg-slate-950/50 border border-slate-700 rounded-xl px-4 py-3 text-blue-300 font-mono text-sm focus:outline-none"
+                    />
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText('condominio_sim_key_123');
+                            alert('Chave de API copiada!');
+                        }}
+                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-6 rounded-xl transition-colors font-bold whitespace-nowrap"
+                    >
+                        Copiar Chave
+                    </button>
+                </div>
+            </div>
+
             <div className="flex justify-between items-start mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">

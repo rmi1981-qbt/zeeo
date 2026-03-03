@@ -23,6 +23,8 @@ export interface ApiDelivery {
     authorized_at?: string;
     entered_at?: string;
     exited_at?: string;
+    qr_code_token?: string;
+    qr_code_expires_at?: string;
 }
 
 export interface StatusUpdatePayload {

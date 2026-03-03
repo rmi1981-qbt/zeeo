@@ -18,6 +18,7 @@ interface ActiveProcessListItemProps {
     onRejectManual: (id: string) => void;
     onExitManual?: (id: string) => void;
     onRecover?: (id: string) => void;
+    onQRCheckInClick?: (delivery: Delivery) => void;
 }
 
 export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
@@ -28,12 +29,14 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onAuthorizeManual,
     onRejectManual,
     onExitManual,
-    onRecover
+    onRecover,
+    onQRCheckInClick
 }) => {
     // Determine active flags based on status
-    const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by);
+    const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by && delivery.status !== 'pre_authorized');
     const isConflict = delivery.status === 'conflicting';
-    const isAuthorized = delivery.status === 'authorized' || delivery.status === 'pre_authorized' || delivery.status === 'inside';
+    const isPreAuthorizedFallback = delivery.status === 'pre_authorized'; // Used when ZK Match fails or isn't fast enough
+    const isAuthorized = delivery.status === 'authorized' || delivery.status === 'inside';
     const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
     const isExited = delivery.status === 'exited';
 
@@ -56,8 +59,9 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                     isAuthorized ? "bg-emerald-900/20 border-emerald-500/50" :
                         isDenied ? "bg-rose-900/20 border-rose-500/50" :
                             isConflict ? "bg-orange-900/20 border-orange-500/50" :
-                                isPending ? "bg-yellow-900/20 border-yellow-500/50" :
-                                    "bg-slate-800/40 border-slate-700 hover:border-slate-600"
+                                isPreAuthorizedFallback ? "bg-amber-900/30 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]" :
+                                    isPending ? "bg-yellow-900/20 border-yellow-500/50" :
+                                        "bg-slate-800/40 border-slate-700 hover:border-slate-600"
             )}
         >
             {/* Header: Driver & Unit */}
@@ -97,8 +101,9 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                         {isExited && <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saída Liberada</span>}
                         {isAuthorized && !isExited && <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Autorizado</span>}
                         {isDenied && <span className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">Negado</span>}
+                        {isPreAuthorizedFallback && <span className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1"><AlertTriangle size={10} /> Fallback Reforçado</span>}
                         {isConflict && <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider flex items-center gap-1"><AlertTriangle size={10} /> Conflito de Respostas</span>}
-                        {isPending && !isConflict && <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Aguardando Morador</span>}
+                        {isPending && !isConflict && !isPreAuthorizedFallback && <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Aguardando Morador</span>}
                     </div>
                 </div>
             </div>
@@ -179,19 +184,33 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
 
             {/* Direct Gatekeeper Actions (Emergency/Override) */}
             {(!isAuthorized && !isDenied && !isExited) && (
-                <div className="mt-3 pt-3 border-t border-slate-800/50 flex justify-between items-center">
-                    <span className="text-[10px] text-slate-500">Ações manuais do porteiro</span>
+                <div className={cn("mt-3 pt-3 border-t flex justify-between items-center", isPreAuthorizedFallback ? "border-amber-500/30" : "border-slate-800/50")}>
+                    <span className={cn("text-[10px]", isPreAuthorizedFallback ? "text-amber-500/80 font-bold" : "text-slate-500")}>
+                        {isPreAuthorizedFallback ? "Validar Morador Manualmente" : "Ações manuais do porteiro"}
+                    </span>
                     <div className="flex gap-2">
                         <button onClick={() => onRejectManual(delivery.id)} className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-colors">Negar Acesso</button>
-                        <button onClick={() => onAuthorizeManual(delivery.id)} className="px-3 py-1.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-xs font-bold transition-colors">Liberar</button>
+                        <button onClick={() => onAuthorizeManual(delivery.id)} className={cn("px-3 py-1.5 rounded text-xs font-bold transition-colors", isPreAuthorizedFallback ? "bg-amber-500 text-slate-900 shadow-md hover:bg-amber-400" : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500")}>
+                            {isPreAuthorizedFallback ? "Confirmar Morador" : "Liberar"}
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Exit Control Action for Authorized Deliveries */}
-            {(isAuthorized && !isExited && onExitManual) && (
+            {/* Entry Control Action for Authorized Deliveries */}
+            {(delivery.status === 'authorized' && !isExited && onQRCheckInClick) && (
                 <div className="mt-3 pt-3 border-t border-emerald-500/30 flex justify-between items-center">
-                    <span className="text-[10px] text-emerald-500/70">Veículo no Condomínio</span>
+                    <span className="text-[10px] text-emerald-500/70">Aguardando Entrada</span>
+                    <button onClick={() => onQRCheckInClick(delivery)} className="px-4 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-colors shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                        Validar QR Code
+                    </button>
+                </div>
+            )}
+
+            {/* Exit Control Action for Inside Deliveries */}
+            {(delivery.status === 'inside' && !isExited && onExitManual) && (
+                <div className="mt-3 pt-3 border-t border-sky-500/30 flex justify-between items-center">
+                    <span className="text-[10px] text-sky-500/70">Veículo no Condomínio</span>
                     <button onClick={() => onExitManual(delivery.id)} className="px-4 py-1.5 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white text-slate-300 text-xs font-bold transition-colors">
                         Liberar Saída
                     </button>

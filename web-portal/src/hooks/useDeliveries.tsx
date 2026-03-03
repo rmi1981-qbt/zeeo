@@ -73,8 +73,9 @@ export function useDeliveries(condoId: string) {
         }
 
         // Subscribe to real-time changes
+        const uniqueChannelName = `deliveries_condo_${condoId}_${Math.random().toString(36).substring(7)}`;
         const subscription = supabase
-            .channel(`public:deliveries:condo_id=eq.${condoId}`)
+            .channel(uniqueChannelName)
             .on(
                 'postgres_changes',
                 {
@@ -84,7 +85,7 @@ export function useDeliveries(condoId: string) {
                     filter: `condo_id=eq.${condoId}`
                 },
                 (payload) => {
-                    // console.log('Realtime change:', payload);
+                    console.log('Realtime change:', payload);
                     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                         const baseData = payload.new as ApiDelivery;
 

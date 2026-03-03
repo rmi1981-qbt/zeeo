@@ -12,6 +12,11 @@ def generate_zeeo_code():
     """Generate a random 4-digit Zeeo code for the delivery."""
     return str(random.randint(1000, 9999))
 
+def generate_qr_token():
+    """Generate a secure 6-character alphanumeric QR Code token."""
+    chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" # Excluded O,0,1,I for readability
+    return ''.join(random.choice(chars) for _ in range(6))
+
 def parse_location(location_data):
     """Parse DB location (WKB/Hex) to (lat, lng)"""
     if not location_data:

@@ -8,6 +8,7 @@ import { ActiveProcessListItem } from '../components/Gatekeeper/ActiveProcessLis
 import { ManualAuthorizationModal, PhoneCallOutcome } from '../components/Gatekeeper/ManualAuthorizationModal';
 import { WhatsAppSimulatorModal } from '../components/Gatekeeper/WhatsAppSimulatorModal';
 import { PushAppSimulatorModal } from '../components/Gatekeeper/PushAppSimulatorModal';
+import { QRScannerModal } from '../components/Gatekeeper/QRScannerModal';
 import { AlertCircle, Clock, MapPin, Navigation, PhoneCall, ShieldCheck, User, Video, X, Loader2, Map as MapIcon, Link as LinkIcon, AlertTriangle, Key, Search, DoorOpen } from 'lucide-react';
 import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
@@ -26,6 +27,7 @@ const Concierge: React.FC = () => {
     const [phoneModalDeliveryId, setPhoneModalDeliveryId] = useState<string | null>(null);
     const [whatsappModalDeliveryId, setWhatsappModalDeliveryId] = useState<string | null>(null);
     const [pushModalDeliveryId, setPushModalDeliveryId] = useState<string | null>(null);
+    const [qrModalDeliveryId, setQrModalDeliveryId] = useState<string | null>(null);
 
     const handlePhoneCallSubmit = async (outcome: PhoneCallOutcome) => {
         if (!phoneModalDeliveryId) return;
@@ -125,9 +127,9 @@ const Concierge: React.FC = () => {
         if (activeTab !== 'saidas' && s === 'exited') return false;
 
         if (activeTab === 'pending') {
-            return ['approaching', 'at_gate', 'created', 'conflicting'].includes(s);
+            return ['approaching', 'at_gate', 'created', 'conflicting', 'pre_authorized'].includes(s);
         } else if (activeTab === 'approved') {
-            return ['authorized', 'pre_authorized', 'inside'].includes(s);
+            return ['authorized', 'inside'].includes(s);
         } else if (activeTab === 'trash') {
             // Trash includes denied/rejected things that haven't expired from the backend yet
             return ['denied', 'rejected'].includes(s);
@@ -263,6 +265,7 @@ const Concierge: React.FC = () => {
                                                 onAuthorizeManual={(id) => updateStatus(id, { status: 'authorized', actor_role: 'concierge', authorization_method: 'manual' })}
                                                 onRejectManual={(id) => updateStatus(id, { status: 'rejected', actor_role: 'concierge', authorization_method: 'manual' })}
                                                 onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
+                                                onQRCheckInClick={(d) => setQrModalDeliveryId(d.id)}
                                                 onRecover={(id) => {
                                                     const del = deliveries.find(d => d.id === id);
                                                     if (del && del.status === 'exited') {
@@ -303,6 +306,13 @@ const Concierge: React.FC = () => {
                 isOpen={!!pushModalDeliveryId}
                 onClose={() => setPushModalDeliveryId(null)}
                 delivery={deliveries.find(d => d.id === pushModalDeliveryId) || null}
+            />
+
+            <QRScannerModal
+                isOpen={!!qrModalDeliveryId}
+                onClose={() => setQrModalDeliveryId(null)}
+                condoId={selectedCondo || ''}
+                onSuccess={() => setQrModalDeliveryId(null)}
             />
 
             {/* New Flow: Sales Demo Injector opens simulator modal directly */}
