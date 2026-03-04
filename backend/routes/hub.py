@@ -44,6 +44,8 @@ async def verify_provider_api_key(x_api_key: str = Header(...)):
     """Verifies the API key belongs to an active Hub Provider."""
     if x_api_key == 'ifood_sim_key_123':
         return {'id': 'simulator', 'name': 'ifood'}
+    if x_api_key == 'condominio_sim_key_123':
+        return {'id': 'simulator', 'name': 'local_condominium'}
 
     res = supabase.table('hub_providers').select('id, name').eq('api_key', x_api_key).eq('is_active', True).execute()
     if not res.data:
@@ -393,4 +395,72 @@ async def check_in_qr(
         import traceback
         err_msg = traceback.format_exc()
         print("QR CHECK-IN ERROR:", err_msg, flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/check-in/biometrics")
+async def check_in_biometrics(
+    payload: schemas.BiometricVerifyPayload,
+    provider_info: dict = Depends(verify_provider_api_key)
+):
+    """
+    Simulates a biometric facial recognition check-in from a physical totem or Gatekeeper manual trigger.
+    It expects a delivery_id that is already authorized or pre_authorized.
+    """
+    try:
+        res = supabase.table('deliveries').select('*')\
+            .eq('id', payload.delivery_id)\
+            .eq('condo_id', payload.condo_id)\
+            .execute()
+            
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Delivery not found for this condominium.")
+            
+        delivery = res.data[0]
+        
+        if delivery['status'] not in ['authorized', 'pre_authorized']:
+            raise HTTPException(status_code=400, detail="Delivery is not in an authorized state for biometric check-in.")
+
+        # Simulate Biometric Match logic using provider API 
+        # In this mock, we assume success if passing image_b64
+        
+        update_data = {
+            'status': 'inside',
+            'entered_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat(),
+        }
+        
+        supabase.table('deliveries').update(update_data).eq('id', delivery['id']).execute()
+        
+        # Dispatch webhook for realtime updates
+        from webhooks import dispatch_webhook
+        
+        updated_delivery_res = supabase.table('deliveries').select('*').eq('id', delivery['id']).execute()
+        if updated_delivery_res.data:
+            dispatch_webhook(payload.condo_id, 'location.updated', updated_delivery_res.data[0])
+        
+        from utils.delivery_helpers import log_delivery_event
+        log_delivery_event(
+            delivery_id=delivery['id'],
+            condo_id=payload.condo_id,
+            event_type='inside',
+            metadata={
+                'method': 'biometrics',
+                'provider': provider_info['name'],
+                'match_score': 0.98 if payload.image_b64 else 0.85
+            }
+        )
+        
+        return {
+            "status": "success", 
+            "message": "Biometria validada com sucesso.", 
+            "delivery_id": delivery['id'],
+            "match_score": 0.98 if payload.image_b64 else 0.85
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print("BIOMETRIC CHECK-IN ERROR:", err_msg, flush=True)
         raise HTTPException(status_code=500, detail=str(e))

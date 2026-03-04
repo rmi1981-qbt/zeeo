@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 import { DriverAppSimulatorModal } from './Gatekeeper/DriverAppSimulatorModal';
 
-export const SalesDemoInjector: React.FC = () => {
+export const SalesDemoInjector: React.FC<{ onDeliveryChange?: () => void }> = ({ onDeliveryChange }) => {
     const { selectedCondo } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
 
@@ -136,6 +136,7 @@ export const SalesDemoInjector: React.FC = () => {
                     provider={simulatorProvider}
                     condoId={selectedCondo}
                     existingDeliveryId={existingDeliveryId}
+                    onDeliveryStarted={onDeliveryChange}
                 />
             )}
         </>

@@ -28,7 +28,7 @@ export interface ApiDelivery {
 }
 
 export interface StatusUpdatePayload {
-    status: string;
+    status?: string;
     driver_lat?: number;
     driver_lng?: number;
     authorization_method?: string;
@@ -41,6 +41,7 @@ export interface StatusUpdatePayload {
     gate_name?: string;
     notes?: string;
     request_channels?: string[];
+    biometrics_verified?: boolean;
 }
 
 export const deliveryService = {

@@ -7,9 +7,10 @@ interface WhatsAppSimulatorModalProps {
     isOpen: boolean;
     onClose: () => void;
     delivery: Delivery | null;
+    onSuccess?: () => void;
 }
 
-export const WhatsAppSimulatorModal: React.FC<WhatsAppSimulatorModalProps> = ({ isOpen, onClose, delivery }) => {
+export const WhatsAppSimulatorModal: React.FC<WhatsAppSimulatorModalProps> = ({ isOpen, onClose, delivery, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<'authorized' | 'denied' | null>(null);
 
@@ -47,6 +48,7 @@ export const WhatsAppSimulatorModal: React.FC<WhatsAppSimulatorModalProps> = ({ 
             }
 
             setResult(decision);
+            if (onSuccess) onSuccess();
             setTimeout(onClose, 1200);
 
         } catch (e: any) {

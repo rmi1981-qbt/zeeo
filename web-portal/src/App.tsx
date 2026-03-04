@@ -7,6 +7,7 @@ import Register from './pages/auth/Register';
 import CondoSelection from './pages/dashboard/CondoSelection';
 import CondominiumSettings from './pages/dashboard/CondominiumSettings';
 import IntegrationsHub from './pages/dashboard/IntegrationsHub';
+import HubMonitoring from './pages/dashboard/HubMonitoring';
 import Concierge from './pages/Concierge';
 import AccessHistory from './pages/AccessHistory';
 import CondoRegistrationWizard from './components/CondoRegistrationWizard';
@@ -79,6 +80,7 @@ function App() {
                                 <Route path="/settings/:condoId" element={<CondominiumSettings />} />
                                 <Route path="/condominium-settings" element={<CondominiumSettings />} />
                                 <Route path="/integrations" element={<IntegrationsHub />} />
+                                <Route path="/hub-monitoring" element={<HubMonitoring />} />
                             </Route>
                         </Route>
 

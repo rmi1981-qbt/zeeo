@@ -1,7 +1,7 @@
 import React from 'react';
 import { Delivery } from '@zeeo/shared';
 import { motion } from 'framer-motion';
-import { Phone, MessageCircle, Bell, Loader2, AlertTriangle, MapPinOff, Navigation } from 'lucide-react';
+import { Phone, MessageCircle, Bell, Loader2, AlertTriangle, MapPinOff, Navigation, ScanFace, ScanLine, ShieldCheck, Clock } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -14,11 +14,12 @@ interface ActiveProcessListItemProps {
     onRequestWhatsApp: (id: string) => void;
     onRequestPush: (id: string) => void;
     onPhoneCallClick: (id: string) => void;
-    onAuthorizeManual: (id: string) => void;
-    onRejectManual: (id: string) => void;
     onExitManual?: (id: string) => void;
     onRecover?: (id: string) => void;
-    onQRCheckInClick?: (delivery: Delivery) => void;
+    onBiometricScanClick?: (delivery: Delivery) => void;
+    onQRScanClick?: (deliveryId: string) => void;
+    onVerifyBiometrics?: (id: string) => void;
+    onLiberateEntry?: (id: string) => void;
 }
 
 export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
@@ -26,19 +27,20 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onRequestWhatsApp,
     onRequestPush,
     onPhoneCallClick,
-    onAuthorizeManual,
-    onRejectManual,
     onExitManual,
     onRecover,
-    onQRCheckInClick
+    onBiometricScanClick,
+    onQRScanClick,
+    onVerifyBiometrics,
+    onLiberateEntry
 }) => {
-    // Determine active flags based on status
     const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by && delivery.status !== 'pre_authorized');
     const isConflict = delivery.status === 'conflicting';
     const isPreAuthorizedFallback = delivery.status === 'pre_authorized'; // Used when ZK Match fails or isn't fast enough
     const isAuthorized = delivery.status === 'authorized' || delivery.status === 'inside';
     const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
     const isExited = delivery.status === 'exited';
+    const isInside = delivery.status === 'inside';
 
     const hasWhatsApp = delivery.request_channels?.includes('whatsapp');
     const hasPush = delivery.request_channels?.includes('push');
@@ -46,6 +48,31 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     // Enable integrations for Simulator / Sales Demo
     const isWhatsAppConfigured = true;
     const isPushConfigured = true;
+
+    // Double-Check State Variables
+    const isEntrada = ['created', 'driver_assigned', 'approaching', 'at_gate', 'conflicting', 'authorized', 'pre_authorized'].includes(delivery.status);
+    const residentApproved = ['authorized', 'inside'].includes(delivery.status) || !!delivery.authorized_by;
+    const biometricsApproved = !!delivery.biometrics_verified || !!delivery.driver_snapshot?.isBiometricVerified;
+    const canLiberate = residentApproved && biometricsApproved;
+
+    let cardColorClasses = "bg-slate-800/40 border-slate-700 hover:border-slate-600";
+    if (isExited) {
+        cardColorClasses = "bg-slate-800/60 border-slate-600/50 opacity-80";
+    } else if (isDenied) {
+        cardColorClasses = "bg-rose-900/20 border-rose-500/50";
+    } else if (isInside) {
+        cardColorClasses = "bg-indigo-900/20 border-indigo-500/50";
+    } else if (isEntrada) {
+        if (isConflict) {
+            cardColorClasses = "bg-orange-900/20 border-orange-500/50";
+        } else if (canLiberate) {
+            cardColorClasses = "bg-emerald-900/20 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]";
+        } else if (residentApproved || biometricsApproved) {
+            cardColorClasses = "bg-amber-900/20 border-amber-500/50";
+        } else {
+            cardColorClasses = "bg-slate-800/40 border-slate-700 hover:border-slate-600"; // Neutral
+        }
+    }
 
     return (
         <motion.div
@@ -55,13 +82,7 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             exit={{ opacity: 0, scale: 0.95 }}
             className={cn(
                 "relative overflow-hidden rounded-xl border p-4 transition-all duration-300",
-                isExited ? "bg-slate-800/60 border-slate-600/50 opacity-80" :
-                    isAuthorized ? "bg-emerald-900/20 border-emerald-500/50" :
-                        isDenied ? "bg-rose-900/20 border-rose-500/50" :
-                            isConflict ? "bg-orange-900/20 border-orange-500/50" :
-                                isPreAuthorizedFallback ? "bg-amber-900/30 border-amber-500/60 shadow-[0_0_15px_rgba(245,158,11,0.1)]" :
-                                    isPending ? "bg-yellow-900/20 border-yellow-500/50" :
-                                        "bg-slate-800/40 border-slate-700 hover:border-slate-600"
+                cardColorClasses
             )}
         >
             {/* Header: Driver & Unit */}
@@ -108,102 +129,124 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                 </div>
             </div>
 
-            {/* Quick Actions for Pending / Unresolved */}
-            {(!isAuthorized && !isDenied && !isExited) && (
-                <div className="mt-3 flex gap-2">
-                    {/* WhatsApp Button */}
-                    <div className="group relative flex-1">
-                        <button
-                            disabled={!isWhatsAppConfigured}
-                            onClick={() => onRequestWhatsApp(delivery.id)}
-                            className={cn(
-                                "w-full flex items-center justify-center space-x-1 py-2 rounded text-xs font-bold transition-all",
-                                isWhatsAppConfigured
-                                    ? "bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 hover:bg-[#25D366]/20"
-                                    : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed",
-                                hasWhatsApp && "bg-[#25D366] text-slate-950"
+            {/* Double-Check & Actions for Entradas */}
+            {isEntrada && (
+                <div className="mt-3 pt-3 border-t border-slate-700/50 flex flex-col gap-3">
+                    {/* Check 1: Morador */}
+                    <div className={cn("p-3 rounded-lg border transition-all", residentApproved ? "bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.05)]" : "bg-slate-800/50 border-slate-700")}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className={cn("text-xs font-bold", residentApproved ? "text-emerald-400" : "text-slate-300")}>
+                                1. Autorização do Morador
+                            </span>
+                            {residentApproved ? (
+                                <span className="text-[10px] text-emerald-500 flex items-center gap-1 uppercase tracking-widest font-bold"><ShieldCheck size={12} /> Aprovado</span>
+                            ) : (
+                                <span className="text-[10px] text-yellow-500 flex items-center gap-1 uppercase tracking-widest font-bold"><Clock size={12} className="animate-pulse" /> Aguardando</span>
                             )}
-                        >
-                            <MessageCircle size={14} />
-                            <span>{hasWhatsApp ? "Enviado" : "WhatsApp"}</span>
-                        </button>
-                        {/* Tooltip */}
-                        {!isWhatsAppConfigured && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-slate-900 text-slate-300 text-[10px] p-2 rounded border border-slate-700 shadow-xl z-10 text-center">
-                                Configuração necessária para ativar WhatsApp.
-                                <br /><br />
-                                <span className="text-slate-500 italic">"Olá, {delivery.driver_snapshot.name} está aguardando liberação na portaria..."</span>
+                        </div>
+                        {!residentApproved && (
+                            <div className="flex flex-col gap-2">
+                                <div className="flex gap-2">
+                                    <div className="group relative flex-1">
+                                        <button
+                                            disabled={!isWhatsAppConfigured}
+                                            onClick={() => onRequestWhatsApp(delivery.id)}
+                                            className={cn(
+                                                "w-full flex items-center justify-center space-x-1 py-1.5 rounded text-xs transition-all",
+                                                isWhatsAppConfigured
+                                                    ? "bg-[#25D366]/10 text-[#25D366] border border-[#25D366]/30 hover:bg-[#25D366]/20"
+                                                    : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed",
+                                                hasWhatsApp && "bg-[#25D366] text-slate-950 font-bold"
+                                            )}
+                                        >
+                                            <MessageCircle size={12} />
+                                            <span>{hasWhatsApp ? "Enviado" : "WhatsApp"}</span>
+                                        </button>
+                                    </div>
+                                    <div className="group relative flex-1">
+                                        <button
+                                            disabled={!isPushConfigured}
+                                            onClick={() => onRequestPush(delivery.id)}
+                                            className={cn(
+                                                "w-full flex items-center justify-center space-x-1 py-1.5 rounded text-xs transition-all",
+                                                isPushConfigured
+                                                    ? "bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20"
+                                                    : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed",
+                                                hasPush && "bg-blue-500 text-white font-bold"
+                                            )}
+                                        >
+                                            <Bell size={12} />
+                                            <span>{hasPush ? "Enviado" : "Push App"}</span>
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => onPhoneCallClick(delivery.id)}
+                                        className="flex-1 flex items-center justify-center space-x-1 py-1.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 text-xs transition-all"
+                                    >
+                                        <Phone size={12} />
+                                        <span>Ligar</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Push Button */}
-                    <div className="group relative flex-1">
-                        <button
-                            disabled={!isPushConfigured}
-                            onClick={() => onRequestPush(delivery.id)}
-                            className={cn(
-                                "w-full flex items-center justify-center space-x-1 py-2 rounded text-xs font-bold transition-all",
-                                isPushConfigured
-                                    ? "bg-blue-500/10 text-blue-400 border border-blue-500/30 hover:bg-blue-500/20"
-                                    : "bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed",
-                                hasPush && "bg-blue-500 text-white"
+                    {/* Check 2: Validação Biometria / Portaria */}
+                    <div className={cn("p-3 rounded-lg border transition-all", biometricsApproved ? "bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.05)]" : "bg-slate-800/50 border-slate-700")}>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className={cn("text-xs font-bold", biometricsApproved ? "text-emerald-400" : "text-slate-300")}>
+                                2. Validação na Portaria
+                            </span>
+                            {biometricsApproved ? (
+                                <span className="text-[10px] text-emerald-500 flex items-center gap-1 uppercase tracking-widest font-bold"><ShieldCheck size={12} /> Validado</span>
+                            ) : (
+                                <span className="text-[10px] text-yellow-500 flex items-center gap-1 uppercase tracking-widest font-bold"><Clock size={12} className="animate-pulse" /> Pendente</span>
                             )}
-                        >
-                            <Bell size={14} />
-                            <span>{hasPush ? "Enviado" : "Push App"}</span>
-                        </button>
-                        {!isPushConfigured && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 bg-slate-900 text-slate-300 text-[10px] p-2 rounded border border-slate-700 shadow-xl z-10 text-center">
-                                Configuração necessária para ativar (Firebase).
+                        </div>
+                        {!biometricsApproved && (
+                            <div className="flex flex-col gap-2">
+                                {onBiometricScanClick && (
+                                    <button
+                                        onClick={() => onBiometricScanClick(delivery)}
+                                        className="w-full flex items-center justify-center gap-2 py-1.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 text-xs transition-all"
+                                    >
+                                        <ScanFace size={14} />
+                                        <span>Reconhecimento Facial</span>
+                                    </button>
+                                )}
+                                {onQRScanClick && (
+                                    <button
+                                        onClick={() => onQRScanClick(delivery.id)}
+                                        className="w-full mt-1 flex items-center justify-center gap-2 py-1.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20 text-xs transition-all"
+                                    >
+                                        <ScanLine size={14} />
+                                        <span>Check-in via Token / QR Code</span>
+                                    </button>
+                                )}
+                                <div className="flex justify-between items-center mt-1 border-t border-slate-700/50 pt-2">
+                                    <span className="text-[9px] text-slate-500">
+                                        Forçar Validação (Falhas / Exceções):
+                                    </span>
+                                    <button onClick={() => onVerifyBiometrics?.(delivery.id)} className="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300 text-[10px] font-bold transition-colors">Validar Documento Visualmente</button>
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Phone Call */}
-                    <button
-                        onClick={() => onPhoneCallClick(delivery.id)}
-                        className="flex-1 flex items-center justify-center space-x-1 py-2 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500/20 text-xs font-bold transition-all"
-                    >
-                        <Phone size={14} />
-                        <span>Ligar</span>
-                    </button>
-
-                    {/* Quick Simulator Access */}
-                    {!delivery.location && (
+                    {/* Main Action Action */}
+                    {!canLiberate && (
+                        <div className="w-full py-2.5 mt-1 rounded-lg border border-slate-700/50 bg-slate-800/30 text-slate-500 cursor-not-allowed flex items-center justify-center gap-2 text-sm font-bold">
+                            <Clock size={16} /> Aguardando {(!residentApproved && !biometricsApproved) ? "Validações" : !residentApproved ? "Morador" : "Portaria"}...
+                        </div>
+                    )}
+                    {canLiberate && (
                         <button
-                            onClick={() => window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: delivery.id, provider: delivery.provider } }))}
-                            className="flex-shrink flex items-center justify-center py-2 px-3 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/20 text-xs font-bold transition-all"
-                            title="Abrir Simulador (Adicionar GPS)"
+                            onClick={() => onLiberateEntry?.(delivery.id)}
+                            className="w-full py-3 mt-1 rounded-lg font-bold text-sm transition-all shadow-lg flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20 animate-in zoom-in"
                         >
-                            📱
+                            <ShieldCheck size={18} /> LIBERAR ENTRADA
                         </button>
                     )}
-                </div>
-            )}
-
-            {/* Direct Gatekeeper Actions (Emergency/Override) */}
-            {(!isAuthorized && !isDenied && !isExited) && (
-                <div className={cn("mt-3 pt-3 border-t flex justify-between items-center", isPreAuthorizedFallback ? "border-amber-500/30" : "border-slate-800/50")}>
-                    <span className={cn("text-[10px]", isPreAuthorizedFallback ? "text-amber-500/80 font-bold" : "text-slate-500")}>
-                        {isPreAuthorizedFallback ? "Validar Morador Manualmente" : "Ações manuais do porteiro"}
-                    </span>
-                    <div className="flex gap-2">
-                        <button onClick={() => onRejectManual(delivery.id)} className="px-3 py-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-xs font-bold transition-colors">Negar Acesso</button>
-                        <button onClick={() => onAuthorizeManual(delivery.id)} className={cn("px-3 py-1.5 rounded text-xs font-bold transition-colors", isPreAuthorizedFallback ? "bg-amber-500 text-slate-900 shadow-md hover:bg-amber-400" : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500")}>
-                            {isPreAuthorizedFallback ? "Confirmar Morador" : "Liberar"}
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Entry Control Action for Authorized Deliveries */}
-            {(delivery.status === 'authorized' && !isExited && onQRCheckInClick) && (
-                <div className="mt-3 pt-3 border-t border-emerald-500/30 flex justify-between items-center">
-                    <span className="text-[10px] text-emerald-500/70">Aguardando Entrada</span>
-                    <button onClick={() => onQRCheckInClick(delivery)} className="px-4 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-colors shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                        Validar QR Code
-                    </button>
                 </div>
             )}
 

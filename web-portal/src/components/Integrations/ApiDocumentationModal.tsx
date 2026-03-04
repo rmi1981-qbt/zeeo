@@ -6,11 +6,12 @@ interface ApiDocumentationModalProps {
     isOpen: boolean;
     onClose: () => void;
     hubProviderKey?: string;
+    integrationName?: string;
 }
 
-export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ isOpen, onClose, hubProviderKey = '<SUA_API_KEY>' }) => {
+export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ isOpen, onClose, hubProviderKey = '<SUA_API_KEY>', integrationName }) => {
     const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
-    const [activeEndpoint, setActiveEndpoint] = useState<'create_delivery' | 'send_approval' | 'check_in_qr' | 'update_location'>('send_approval');
+    const [activeEndpoint, setActiveEndpoint] = useState<string>('');
 
     const handleCopy = (text: string, id: string) => {
         navigator.clipboard.writeText(text);
@@ -18,8 +19,9 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
         setTimeout(() => setCopiedStates(prev => ({ ...prev, [id]: false })), 2000);
     };
 
-    const endpoints = {
+    const endpoints: Record<string, any> = {
         'send_approval': {
+            supported_integrations: ['app_condominio', 'whatsapp'],
             title: 'Enviar Aprovação do Morador',
             method: 'POST',
             path: '/hub/webhook/approval',
@@ -41,6 +43,7 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
   }'`
         },
         'create_delivery': {
+            supported_integrations: ['ifood', 'mercadolivre', 'uber', 'app_condominio'],
             title: 'Injetar Nova Entrega (Inbound)',
             method: 'POST',
             path: '/hub/inbound/{provider}/delivery',
@@ -64,6 +67,7 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
   }'`
         },
         'update_location': {
+            supported_integrations: ['ifood', 'mercadolivre', 'uber'],
             title: 'Atualizar Localização (GPS)',
             method: 'POST',
             path: '/hub/inbound/{provider}/location/{delivery_id}',
@@ -81,6 +85,7 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
   }'`
         },
         'check_in_qr': {
+            supported_integrations: ['in_house', 'intelbras'],
             title: 'Validação de QR Code (Check-in)',
             method: 'POST',
             path: '/hub/check-in/qr',
@@ -96,10 +101,58 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
     "condo_id": "123e4567-e89b-12d3",
     "qr_code_token": "XB9PQ2"
   }'`
+        },
+        'check_in_biometrics': {
+            supported_integrations: ['in_house', 'intelbras', 'ifood', 'uber'],
+            title: 'Validação Biométrica (Check-in)',
+            method: 'POST',
+            path: '/hub/check-in/biometrics',
+            desc: 'Realiza o check-in do entregador via reconhecimento facial preditivo (câmera IP ou Totem). Converte automaticamente a entrega do status "authorized" ou "pre_authorized" para "inside".',
+            payload: `{
+  "condo_id": "uuid-do-condominio",
+  "delivery_id": "uuid-da-entrega",
+  "image_b64": "base64-da-foto", // opcional
+  "provider_token": "token-do-biometria" // opcional
+}`,
+            curl: `curl -X POST https://api.zeeo.com.br/hub/check-in/biometrics \\
+  -H "Content-Type: application/json" \\
+  -H "x-api-key: ${hubProviderKey}" \\
+  -d '{
+    "condo_id": "123e4567-e89b-12d3",
+    "delivery_id": "987fcdeb-51a2-43d7"
+  }'`
         }
     };
 
-    const activeData = endpoints[activeEndpoint];
+    // Helper map from visually distinct ID to actual internal provider logic for documentation (mapping Integration ID to Doc ID logic)
+    const mapIntegrationToType = (id: string | undefined) => {
+        if (!id) return 'all'; // Support generic hub view
+        if (id === 'app_condominio') return 'app_condominio';
+        if (id === 'whatsapp') return 'whatsapp';
+        if (id === 'sistema_condominio') return 'in_house';
+        if (id === 'intelbras') return 'intelbras';
+        if (id === 'ifood') return 'ifood';
+        if (id === 'mercadolivre') return 'mercadolivre';
+        if (id === 'uber') return 'uber';
+        return 'all';
+    }
+
+    const currentType = mapIntegrationToType(integrationName?.toLowerCase().replace(' ', '_'));
+
+    // Filter available endpoints based on the integration type
+    const availableEndpoints = Object.keys(endpoints).filter(key => {
+        if (currentType === 'all') return true;
+        return endpoints[key].supported_integrations?.includes(currentType);
+    });
+
+    React.useEffect(() => {
+        if (availableEndpoints.length > 0 && !availableEndpoints.includes(activeEndpoint)) {
+            setActiveEndpoint(availableEndpoints[0]);
+        }
+    }, [integrationName, availableEndpoints, activeEndpoint]);
+
+
+    const activeData = activeEndpoint ? endpoints[activeEndpoint] : null;
 
     if (!isOpen) return null;
 
@@ -127,8 +180,10 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
                                 <BookOpen size={20} />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white tracking-tight">Documentação da API do Hub</h2>
-                                <p className="text-xs text-slate-400">Integre seus sistemas de aprovação e logística ao Zeeo</p>
+                                <h2 className="text-xl font-bold text-white tracking-tight">
+                                    Documentação da API: <span className="text-primary-400">{integrationName || 'Hub Geral'}</span>
+                                </h2>
+                                <p className="text-xs text-slate-400">APIs e Webhooks disponíveis para a conexão com esta plataforma</p>
                             </div>
                         </div>
                         <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-800">
@@ -142,51 +197,76 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
                         {/* Sidebar (Endpoints) */}
                         <div className="w-1/3 border-r border-slate-800 bg-slate-900/30 overflow-y-auto">
                             <div className="p-4 space-y-2">
-                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 ml-2">Endpoints</h3>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 ml-2">Endpoints Relacionados</h3>
 
-                                <button
-                                    onClick={() => setActiveEndpoint('send_approval')}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'send_approval' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
-                                    </div>
-                                    <div className="font-semibold text-sm">Enviar Aprovação</div>
-                                    <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/webhook/approval</div>
-                                </button>
+                                {availableEndpoints.length === 0 && (
+                                    <div className="text-sm text-slate-400 p-2 text-center">Nenhum endpoint da nossa API pública é necessário para esta integração funcionar passivamente.</div>
+                                )}
 
-                                <button
-                                    onClick={() => setActiveEndpoint('create_delivery')}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'create_delivery' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
-                                    </div>
-                                    <div className="font-semibold text-sm">Injetar Entrega</div>
-                                    <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/inbound...</div>
-                                </button>
+                                {availableEndpoints.includes('send_approval') && (
+                                    <button
+                                        onClick={() => setActiveEndpoint('send_approval')}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'send_approval' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                        </div>
+                                        <div className="font-semibold text-sm">Enviar Aprovação</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/webhook/approval</div>
+                                    </button>
+                                )}
 
-                                <button
-                                    onClick={() => setActiveEndpoint('update_location')}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'update_location' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
-                                    </div>
-                                    <div className="font-semibold text-sm">Atualizar GPS</div>
-                                    <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/inbound...</div>
-                                </button>
+                                {availableEndpoints.includes('create_delivery') && (
+                                    <button
+                                        onClick={() => setActiveEndpoint('create_delivery')}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'create_delivery' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                        </div>
+                                        <div className="font-semibold text-sm">Injetar Entrega</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/inbound...</div>
+                                    </button>
+                                )}
 
-                                <button
-                                    onClick={() => setActiveEndpoint('check_in_qr')}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'check_in_qr' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
-                                    </div>
-                                    <div className="font-semibold text-sm">Validar QR Code</div>
-                                    <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/check-in/qr</div>
-                                </button>
+                                {availableEndpoints.includes('update_location') && (
+                                    <button
+                                        onClick={() => setActiveEndpoint('update_location')}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'update_location' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                        </div>
+                                        <div className="font-semibold text-sm">Atualizar GPS</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/inbound...</div>
+                                    </button>
+                                )}
+
+                                {availableEndpoints.includes('check_in_qr') && (
+                                    <button
+                                        onClick={() => setActiveEndpoint('check_in_qr')}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'check_in_qr' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                        </div>
+                                        <div className="font-semibold text-sm">Validar QR Code</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/check-in/qr</div>
+                                    </button>
+                                )}
+
+                                {availableEndpoints.includes('check_in_biometrics') && (
+                                    <button
+                                        onClick={() => setActiveEndpoint('check_in_biometrics')}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'check_in_biometrics' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">POST</span>
+                                        </div>
+                                        <div className="font-semibold text-sm">Validar Biometria</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/check-in/biometrics</div>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="p-4 mt-6">
@@ -199,64 +279,70 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
 
                         {/* Main Doc Content */}
                         <div className="w-2/3 flex flex-col overflow-y-auto bg-slate-950">
-                            <div className="p-8">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <span className="px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded font-mono text-xs font-bold tracking-wider">
-                                        {activeData.method}
-                                    </span>
-                                    <span className="font-mono text-slate-300 text-sm">
-                                        {activeData.path}
-                                    </span>
-                                </div>
-                                <h1 className="text-2xl font-bold text-white mb-4">{activeData.title}</h1>
-                                <p className="text-slate-400 text-sm leading-relaxed mb-8">
-                                    {activeData.desc}
-                                </p>
+                            {activeData ? (
+                                <div className="p-8">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <span className="px-2 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded font-mono text-xs font-bold tracking-wider">
+                                            {activeData.method}
+                                        </span>
+                                        <span className="font-mono text-slate-300 text-sm">
+                                            {activeData.path}
+                                        </span>
+                                    </div>
+                                    <h1 className="text-2xl font-bold text-white mb-4">{activeData.title}</h1>
+                                    <p className="text-slate-400 text-sm leading-relaxed mb-8">
+                                        {activeData.desc}
+                                    </p>
 
-                                <div className="space-y-6">
-                                    {/* JSON Payload Block */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                                                <Code2 size={16} /> JSON Payload
-                                            </h3>
-                                            <button
-                                                onClick={() => handleCopy(activeData.payload, 'payload')}
-                                                className="text-xs flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
-                                            >
-                                                {copiedStates['payload'] ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                                {copiedStates['payload'] ? 'Copiado!' : 'Copiar'}
-                                            </button>
+                                    <div className="space-y-6">
+                                        {/* JSON Payload Block */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                                                    <Code2 size={16} /> JSON Payload
+                                                </h3>
+                                                <button
+                                                    onClick={() => handleCopy(activeData.payload, 'payload')}
+                                                    className="text-xs flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
+                                                >
+                                                    {copiedStates['payload'] ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                                    {copiedStates['payload'] ? 'Copiado!' : 'Copiar'}
+                                                </button>
+                                            </div>
+                                            <div className="bg-[#0d1117] border border-slate-800 rounded-xl p-4 overflow-x-auto relative group">
+                                                <pre className="text-xs text-slate-300 font-mono leading-relaxed">
+                                                    <code>{activeData.payload}</code>
+                                                </pre>
+                                            </div>
                                         </div>
-                                        <div className="bg-[#0d1117] border border-slate-800 rounded-xl p-4 overflow-x-auto relative group">
-                                            <pre className="text-xs text-slate-300 font-mono leading-relaxed">
-                                                <code>{activeData.payload}</code>
-                                            </pre>
+
+                                        {/* cURL Block */}
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2 mt-8">
+                                                <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                                                    <Terminal size={16} /> Exemplo (cURL)
+                                                </h3>
+                                                <button
+                                                    onClick={() => handleCopy(activeData.curl, 'curl')}
+                                                    className="text-xs flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
+                                                >
+                                                    {copiedStates['curl'] ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                                                    {copiedStates['curl'] ? 'Copiado!' : 'Copiar'}
+                                                </button>
+                                            </div>
+                                            <div className="bg-[#0d1117] border border-slate-800 rounded-xl p-4 overflow-x-auto relative group">
+                                                <pre className="text-xs text-blue-300 font-mono leading-relaxed">
+                                                    <code>{activeData.curl}</code>
+                                                </pre>
+                                            </div>
                                         </div>
                                     </div>
-
-                                    {/* cURL Block */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-2 mt-8">
-                                            <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                                                <Terminal size={16} /> Exemplo (cURL)
-                                            </h3>
-                                            <button
-                                                onClick={() => handleCopy(activeData.curl, 'curl')}
-                                                className="text-xs flex items-center gap-1 text-slate-500 hover:text-slate-300 transition-colors"
-                                            >
-                                                {copiedStates['curl'] ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                                                {copiedStates['curl'] ? 'Copiado!' : 'Copiar'}
-                                            </button>
-                                        </div>
-                                        <div className="bg-[#0d1117] border border-slate-800 rounded-xl p-4 overflow-x-auto relative group">
-                                            <pre className="text-xs text-blue-300 font-mono leading-relaxed">
-                                                <code>{activeData.curl}</code>
-                                            </pre>
-                                        </div>
-                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="p-8 flex items-center justify-center h-full text-slate-500">
+                                    Selecione um endpoint na barra lateral ou veja as capacidades exclusivas desta integração.
+                                </div>
+                            )}
                         </div>
 
                     </div>

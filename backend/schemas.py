@@ -61,6 +61,7 @@ class DeliveryBase(BaseModel):
     condo_id: str
     unit: Optional[str] = None
     status: Optional[str] = 'created' # created, driver_assigned, approaching, at_gate, inside, completed, rejected, pre_authorized
+    biometrics_verified: Optional[bool] = False
     platform: Optional[str] = 'mock' # ifood, ubereats, mercadolivre, rappi, other, mock
     driver_name: Optional[str] = None
     driver_photo: Optional[str] = None
@@ -79,6 +80,7 @@ class DeliveryUpdate(BaseModel):
     eta: Optional[datetime] = None
     # Authorization fields
     authorization_method: Optional[str] = None  # app_zeeo, whatsapp, push, phone_call, intercom, pre_authorized, manual
+    biometrics_verified: Optional[bool] = None
     actor_id: Optional[str] = None
     actor_name: Optional[str] = None
     actor_role: Optional[str] = None  # concierge, resident, admin, system
@@ -174,3 +176,9 @@ class Gate(GateBase):
 
     class Config:
         from_attributes = True
+
+class BiometricVerifyPayload(BaseModel):
+    condo_id: str
+    delivery_id: str
+    image_b64: Optional[str] = None # Simulated base64 image from the physical totem 
+    provider_token: Optional[str] = None # Or an ID for the driver if we are checking the provider directly

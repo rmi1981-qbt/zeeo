@@ -15,6 +15,7 @@ interface DriverAppSimulatorModalProps {
     provider: 'ifood' | 'mercadolivre' | 'ubereats';
     condoId: string;
     existingDeliveryId?: string | null;
+    onDeliveryStarted?: () => void;
 }
 
 const PROVIDER_API_KEYS: Record<string, string> = {
@@ -60,7 +61,8 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
     onClose,
     provider,
     condoId,
-    existingDeliveryId
+    existingDeliveryId,
+    onDeliveryStarted
 }) => {
     const [step, setStep] = useState<'setup' | 'active'>('setup');
     const [deliveryId, setDeliveryId] = useState<string | null>(null);
@@ -75,7 +77,7 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
     // Additional configuration state
     const [condos, setCondos] = useState<Condo[]>([]);
     const [selectedCondoId, setSelectedCondoId] = useState<string>(condoId);
-    const [simulatePreAuth, setSimulatePreAuth] = useState(false);
+    const [simulateAuthBehavior, setSimulateAuthBehavior] = useState<'none' | 'pre_authorized' | 'authorized'>('none');
 
     // Map State (default to approx location of Alphaville or generic)
     const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number }>({ lat: -23.5029, lng: -46.8488 });
@@ -84,7 +86,7 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
     // Initial setup when modal opens
     useEffect(() => {
         if (isOpen) {
-            setSimulatePreAuth(false);
+            setSimulateAuthBehavior('none');
 
             // Load condos
             condoService.getCondos()
@@ -204,8 +206,14 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
             setStatus(data.data.status);
 
             // Handle pre-auth if checked
-            if (simulatePreAuth) {
+            if (simulateAuthBehavior !== 'none') {
                 try {
+                    const notesMap = {
+                        'pre_authorized': 'Pré-autorizado via Zero-Knowledge Match (Fallback)',
+                        'authorized': 'Morador Auto-Aprovou pelo App Parceiro',
+                        'none': ''
+                    };
+
                     const authResponse = await fetch(`http://localhost:8000/api/hub/webhook/approval`, {
                         method: 'POST',
                         headers: {
@@ -214,10 +222,10 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                         },
                         body: JSON.stringify({
                             delivery_id: newDeliveryId,
-                            decision: 'pre_authorized',
+                            decision: simulateAuthBehavior,
                             channel: 'app_zeeo',
                             actor_id: 'Simulador',
-                            notes: 'Pré-autorizado via Zero-Knowledge Match',
+                            notes: notesMap[simulateAuthBehavior],
                             phone_hash: 'a869177964cc68954ffec997bbad30769f8a5a6fdc60f296ddbc60b9347dc416'
                         })
                     });
@@ -227,13 +235,14 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                         throw new Error(errData.detail || 'Failed to authorize delivery via Webhook');
                     }
 
-                    setStatus('authorized');
+                    setStatus(simulateAuthBehavior);
                 } catch (e) {
                     console.error("Failed to simulate pre-auth:", e);
                 }
             }
 
             setStep('active');
+            if (onDeliveryStarted) onDeliveryStarted();
 
         } catch (err: any) {
             alert("Erro ao iniciar corrida: " + err.message);
@@ -242,11 +251,16 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
         }
     };
 
-    const handleSimulatePreAuth = async () => {
+    const handleSimulateWebhook = async (decision: 'pre_authorized' | 'authorized') => {
         if (!deliveryId) return;
         setLoading(true);
         try {
             const apiKey = PROVIDER_API_KEYS[provider];
+            const notesMap = {
+                'pre_authorized': 'Pré-autorização Zero-Knowledge (Fallback - Atrasado)',
+                'authorized': 'Aprovação Direta do Morador (Atrasado)'
+            };
+
             const authResponse = await fetch(`http://localhost:8000/api/hub/webhook/approval`, {
                 method: 'POST',
                 headers: {
@@ -255,10 +269,10 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                 },
                 body: JSON.stringify({
                     delivery_id: deliveryId,
-                    decision: 'pre_authorized',
+                    decision: decision,
                     channel: 'app_zeeo',
                     actor_id: 'Simulador',
-                    notes: 'Pré-autorização Zero-Knowledge (Atrasada)',
+                    notes: notesMap[decision],
                     phone_hash: 'a869177964cc68954ffec997bbad30769f8a5a6fdc60f296ddbc60b9347dc416'
                 })
             });
@@ -268,10 +282,11 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                 throw new Error(errData.detail || 'Failed to authorize delivery via Webhook');
             }
 
-            setStatus('authorized');
+            setStatus(decision);
+            if (onDeliveryStarted) onDeliveryStarted(); // Notify parent Concierge to refresh
         } catch (e: any) {
-            console.error("Failed to simulate pre-auth:", e);
-            alert("Erro ao simular pré-autorização: " + e.message);
+            console.error("Failed to simulate webhook:", e);
+            alert("Erro ao enviar webhook: " + e.message);
         } finally {
             setLoading(false);
         }
@@ -405,21 +420,18 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                                     />
                                 </div>
 
-                                <div className="pt-2">
-                                    <label className="flex items-center space-x-3 cursor-pointer group">
-                                        <div className="relative flex items-center justify-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={simulatePreAuth}
-                                                onChange={(e) => setSimulatePreAuth(e.target.checked)}
-                                                className="peer appearance-none w-5 h-5 border-2 border-slate-300 rounded focus:ring-primary-500 checked:bg-primary-500 checked:border-primary-500 transition-colors"
-                                            />
-                                            <CheckCircle size={14} className="absolute text-white opacity-0 peer-checked:opacity-100 pointer-events-none" strokeWidth={3} />
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-700 group-hover:text-primary-600 transition-colors">
-                                            Simular pré-autorização pelo morador
-                                        </span>
-                                    </label>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Comportamento da Integração</label>
+                                    <select
+                                        value={simulateAuthBehavior}
+                                        onChange={(e) => setSimulateAuthBehavior(e.target.value as any)}
+                                        className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        <option value="none">Padrão (Aguardar Portaria)</option>
+                                        <option value="pre_authorized">Fallback Reforçado/Erro no Match</option>
+                                        <option value="authorized">Auto-Aprovação (Morador Aprovou pelo App)</option>
+                                    </select>
+                                    <p className="text-[10px] text-slate-500 mt-1 pl-1">Define que mensagem o parceiro mandou ao aceitar.</p>
                                 </div>
                             </div>
 
@@ -500,14 +512,24 @@ export const DriverAppSimulatorModal: React.FC<DriverAppSimulatorModalProps> = (
                                 </button>
 
                                 {['created', 'driver_assigned', 'approaching', 'at_gate'].includes(status) && (
-                                    <button
-                                        onClick={handleSimulatePreAuth}
-                                        disabled={loading}
-                                        className="w-full mt-4 bg-white text-slate-700 border-2 border-slate-300 font-bold text-lg py-4 rounded-2xl active:scale-95 transition-all flex justify-center items-center gap-2 shadow-sm"
-                                    >
-                                        <CheckCircle size={20} className={loading ? 'animate-pulse' : 'text-emerald-500'} />
-                                        Disparar Pré-Autorização
-                                    </button>
+                                    <div className="flex gap-2 mt-4">
+                                        <button
+                                            onClick={() => handleSimulateWebhook('pre_authorized')}
+                                            disabled={loading}
+                                            className="flex-1 bg-white text-slate-700 border-2 border-slate-300 font-bold text-xs py-3 rounded-2xl active:scale-95 transition-all flex flex-col justify-center items-center gap-1 shadow-sm"
+                                        >
+                                            <CheckCircle size={16} className={loading ? 'animate-pulse' : 'text-amber-500'} />
+                                            Disparar Fallback
+                                        </button>
+                                        <button
+                                            onClick={() => handleSimulateWebhook('authorized')}
+                                            disabled={loading}
+                                            className="flex-1 bg-white text-slate-700 border-2 border-slate-300 font-bold text-xs py-3 rounded-2xl active:scale-95 transition-all flex flex-col justify-center items-center gap-1 shadow-sm"
+                                        >
+                                            <CheckCircle size={16} className={loading ? 'animate-pulse' : 'text-emerald-500'} />
+                                            Auto-Aprovação
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>

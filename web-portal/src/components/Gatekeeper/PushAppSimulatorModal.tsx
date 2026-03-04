@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Building2, Bell } from 'lucide-react';
+import { X, Check, Building2 } from 'lucide-react';
 import { Delivery } from '@zeeo/shared';
 
 interface PushAppSimulatorModalProps {
     isOpen: boolean;
     onClose: () => void;
     delivery: Delivery | null;
+    onSuccess?: () => void;
 }
 
-export const PushAppSimulatorModal: React.FC<PushAppSimulatorModalProps> = ({ isOpen, onClose, delivery }) => {
+export const PushAppSimulatorModal: React.FC<PushAppSimulatorModalProps> = ({ isOpen, onClose, delivery, onSuccess }) => {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<'authorized' | 'denied' | null>(null);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -49,6 +50,7 @@ export const PushAppSimulatorModal: React.FC<PushAppSimulatorModalProps> = ({ is
             }
 
             setResult(decision);
+            if (onSuccess) onSuccess();
             setTimeout(onClose, 1500);
 
         } catch (e: any) {

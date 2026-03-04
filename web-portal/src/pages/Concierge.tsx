@@ -8,16 +8,16 @@ import { ActiveProcessListItem } from '../components/Gatekeeper/ActiveProcessLis
 import { ManualAuthorizationModal, PhoneCallOutcome } from '../components/Gatekeeper/ManualAuthorizationModal';
 import { WhatsAppSimulatorModal } from '../components/Gatekeeper/WhatsAppSimulatorModal';
 import { PushAppSimulatorModal } from '../components/Gatekeeper/PushAppSimulatorModal';
+import { BiometricScannerModal } from '../components/Gatekeeper/BiometricScannerModal';
 import { QRScannerModal } from '../components/Gatekeeper/QRScannerModal';
-import { AlertCircle, Clock, MapPin, Navigation, PhoneCall, ShieldCheck, User, Video, X, Loader2, Map as MapIcon, Link as LinkIcon, AlertTriangle, Key, Search, DoorOpen } from 'lucide-react';
+import { Search, DoorOpen } from 'lucide-react';
 import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
 const Concierge: React.FC = () => {
     const { selectedCondo } = useAuth();
-    const { deliveries, updateStatus } = useDeliveries(selectedCondo || 'mock');
+    const { deliveries, updateStatus, fetchDeliveries } = useDeliveries(selectedCondo || 'mock');
 
     const [providerFilter, setProviderFilter] = useState<string>('all');
-    const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'saidas' | 'trash'>('pending');
     const [searchQuery, setSearchQuery] = useState('');
     const [gates, setGates] = useState<{ id: string; name: string; lat: number; lng: number; is_main: boolean }[]>([]);
     const [condoCenter, setCondoCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
@@ -27,6 +27,7 @@ const Concierge: React.FC = () => {
     const [phoneModalDeliveryId, setPhoneModalDeliveryId] = useState<string | null>(null);
     const [whatsappModalDeliveryId, setWhatsappModalDeliveryId] = useState<string | null>(null);
     const [pushModalDeliveryId, setPushModalDeliveryId] = useState<string | null>(null);
+    const [biometricModalDeliveryId, setBiometricModalDeliveryId] = useState<string | null>(null);
     const [qrModalDeliveryId, setQrModalDeliveryId] = useState<string | null>(null);
 
     const handlePhoneCallSubmit = async (outcome: PhoneCallOutcome) => {
@@ -107,6 +108,7 @@ const Concierge: React.FC = () => {
     const filteredDeliveries = deliveries.filter(d => {
         const s = d.status || '';
 
+        // Base Filter
         // Exclude completely finalized processes (completed)
         if (s === 'completed') return false;
 
@@ -122,23 +124,13 @@ const Concierge: React.FC = () => {
             if (!gateMatch && !unitMatch && !plateMatch) return false;
         }
 
-        // 3. Tab Filter
-        if (activeTab === 'saidas' && s !== 'exited') return false;
-        if (activeTab !== 'saidas' && s === 'exited') return false;
-
-        if (activeTab === 'pending') {
-            return ['approaching', 'at_gate', 'created', 'conflicting', 'pre_authorized'].includes(s);
-        } else if (activeTab === 'approved') {
-            return ['authorized', 'inside'].includes(s);
-        } else if (activeTab === 'trash') {
-            // Trash includes denied/rejected things that haven't expired from the backend yet
-            return ['denied', 'rejected'].includes(s);
-        } else if (activeTab === 'saidas') {
-            return s === 'exited';
-        }
-
         return true;
     }).sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()); // Sort newest first
+
+    const entradasQueue = filteredDeliveries.filter(d => ['created', 'driver_assigned', 'approaching', 'at_gate', 'conflicting', 'pre_authorized', 'authorized'].includes(d.status || ''));
+    const insideQueue = filteredDeliveries.filter(d => ['inside'].includes(d.status || ''));
+    const saidasQueue = filteredDeliveries.filter(d => ['exited'].includes(d.status || ''));
+    const trashQueue = filteredDeliveries.filter(d => ['denied', 'rejected'].includes(d.status || ''));
 
     return (
         <div className="flex h-screen w-full bg-slate-950 text-white overflow-hidden font-sans">
@@ -147,140 +139,206 @@ const Concierge: React.FC = () => {
             <div className="flex-1 flex flex-col h-full relative z-10">
 
                 {/* BOARD CONTENT */}
-                <main className="flex-1 p-6 overflow-hidden">
-                    <div className="flex h-full gap-6 max-w-[1800px] mx-auto">
+                <main className="flex-1 p-4 lg:p-6 overflow-hidden">
+                    <div className="flex h-full gap-4 lg:gap-6 max-w-[1800px] mx-auto">
 
-                        {/* COL 1: LIVE MAP (65%) */}
-                        <div className="flex-[2] flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm relative overflow-hidden group">
-                            <LiveMap
-                                deliveries={deliveries}
-                                gates={gates}
-                                center={condoCenter}
-                                condoPerimeter={condoPerimeter}
-                                onMarkerDragEnd={(id, lat, lng) => {
-                                    const deliveryToUpdate = deliveries.find(d => d.id === id);
-                                    if (deliveryToUpdate) {
-                                        updateStatus(id, {
-                                            status: deliveryToUpdate.status,
-                                            driver_lat: lat,
-                                            driver_lng: lng
-                                        });
-                                    }
-                                }}
-                                onMarkerClick={(id, provider) => {
-                                    window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: id, provider } }));
-                                }}
-                            />
-                        </div>
-
-                        {/* COL 2: PLANNER / OPERATIONAL (35%) */}
-                        <div className="flex-1 flex flex-col h-full space-y-6">
-
-                            {/* AT GATE (Active Action Required) */}
-                            <div className="flex-1 flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden">
-                                <div className="p-4 border-b border-slate-800/50 flex flex-col gap-3 bg-slate-900/80 backdrop-blur-md">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-lg font-bold text-slate-100 flex items-center space-x-2">
-                                            <div className="w-2.5 h-2.5 bg-yellow-400 rounded-sm rotate-45 animate-pulse" />
-                                            <span>Processos Ativos</span>
-                                        </h2>
-                                        <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-1 rounded-full">{filteredDeliveries.length}</span>
-                                    </div>
-
-                                    {/* Tabs */}
-                                    <div className="flex bg-slate-950/50 p-1 rounded-lg">
-                                        {[
-                                            { id: 'pending', label: 'Pendentes' },
-                                            { id: 'approved', label: 'Aprovados' },
-                                            { id: 'saidas', label: 'Saídas' },
-                                            { id: 'trash', label: 'Lixeira' }
-                                        ].map(tab => (
-                                            <button
-                                                key={tab.id}
-                                                onClick={() => setActiveTab(tab.id as any)}
-                                                className={`flex-1 text-center py-1.5 rounded-md text-xs font-bold transition-all ${activeTab === tab.id
-                                                    ? 'bg-slate-800 text-white shadow-sm'
-                                                    : 'text-slate-500 hover:text-slate-300'
-                                                    }`}
-                                            >
-                                                {tab.label}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {/* Smart Filter */}
-                                    <div className="relative">
-                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar unidade, placa ou portaria..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-blue-500/50 transition-colors placeholder:text-slate-600"
-                                        />
-                                    </div>
-
-                                    {/* Quick Provider Filters */}
-                                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-                                        {[
-                                            { id: 'all', label: 'Todos' },
-                                            { id: 'ifood', label: 'iFood' },
-                                            { id: 'mercadolivre', label: 'Mercado Livre' },
-                                            { id: 'uber', label: 'Uber' }
-                                        ].map(f => (
-                                            <button
-                                                key={f.id}
-                                                onClick={() => setProviderFilter(f.id)}
-                                                className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${providerFilter === f.id
-                                                    ? 'bg-blue-600 border-blue-500 text-white shadow-sm shadow-blue-900/20'
-                                                    : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
-                                                    }`}
-                                            >
-                                                {f.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                        {/* COL 1: ENTRADAS (25%) */}
+                        <div className="w-1/4 flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden">
+                            <div className="p-4 border-b border-slate-800/50 flex flex-col gap-3 bg-slate-900/80 backdrop-blur-md">
+                                <div className="flex justify-between items-center">
+                                    <h2 className="text-base lg:text-lg font-bold text-slate-100 flex items-center space-x-2">
+                                        <div className="w-2.5 h-2.5 bg-yellow-400 rounded-sm rotate-45 animate-pulse" />
+                                        <span>Entradas</span>
+                                    </h2>
+                                    <span className="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-1 rounded-full">{entradasQueue.length}</span>
                                 </div>
 
-                                <div className="p-4 overflow-y-auto space-y-4 flex-1 scrollbar-hide">
-                                    <AnimatePresence mode="popLayout">
-                                        {filteredDeliveries.length === 0 && (
-                                            <div className="text-center py-10 text-slate-600">
-                                                <p className="text-sm">Nenhum processo {activeTab === 'trash' ? 'na lixeira' : 'encontrado'}</p>
-                                            </div>
-                                        )}
-                                        {filteredDeliveries.map(d => (
-                                            <ActiveProcessListItem
-                                                key={d.id}
-                                                delivery={d}
-                                                onRequestWhatsApp={(id) => {
-                                                    updateStatus(id, { status: 'at_gate', request_channels: ['whatsapp'], notes: 'whatsapp_requested' });
-                                                    setWhatsappModalDeliveryId(id);
-                                                }}
-                                                onRequestPush={(id) => {
-                                                    updateStatus(id, { status: 'at_gate', request_channels: ['push'], notes: 'push_requested' });
-                                                    setPushModalDeliveryId(id);
-                                                }}
-                                                onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
-                                                onAuthorizeManual={(id) => updateStatus(id, { status: 'authorized', actor_role: 'concierge', authorization_method: 'manual' })}
-                                                onRejectManual={(id) => updateStatus(id, { status: 'rejected', actor_role: 'concierge', authorization_method: 'manual' })}
-                                                onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
-                                                onQRCheckInClick={(d) => setQrModalDeliveryId(d.id)}
-                                                onRecover={(id) => {
-                                                    const del = deliveries.find(d => d.id === id);
-                                                    if (del && del.status === 'exited') {
-                                                        updateStatus(id, { status: 'inside', actor_role: 'concierge', notes: 'recovered_exit' });
-                                                    } else {
-                                                        updateStatus(id, { status: 'at_gate', request_channels: ['recovered'], notes: 'recovered_from_trash' });
-                                                    }
-                                                }}
-                                            />
-                                        ))}
-                                    </AnimatePresence>
+                                {/* Smart Filter */}
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full bg-slate-950/50 border border-slate-800 text-slate-200 text-sm rounded-lg pl-9 pr-3 py-2 outline-none focus:border-blue-500/50 transition-colors placeholder:text-slate-600"
+                                    />
+                                </div>
+
+                                {/* Provider Filters */}
+                                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                                    {[
+                                        { id: 'all', label: 'Todos' },
+                                        { id: 'ifood', label: 'iFood' },
+                                        { id: 'mercadolivre', label: 'Mercado Livre' },
+                                        { id: 'uber', label: 'Uber' }
+                                    ].map(f => (
+                                        <button
+                                            key={f.id}
+                                            onClick={() => setProviderFilter(f.id)}
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors border ${providerFilter === f.id
+                                                ? 'bg-blue-600 border-blue-500 text-white shadow-sm shadow-blue-900/20'
+                                                : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                                                }`}
+                                        >
+                                            {f.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
+                            <div className="p-4 overflow-y-auto space-y-3 flex-1 scrollbar-hide">
+                                <AnimatePresence mode="popLayout">
+                                    {entradasQueue.length > 0 ? entradasQueue.map(d => (
+                                        <ActiveProcessListItem
+                                            key={d.id}
+                                            delivery={d}
+                                            onRequestWhatsApp={(id) => setWhatsappModalDeliveryId(id)}
+                                            onRequestPush={(id) => setPushModalDeliveryId(id)}
+                                            onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
+                                            onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
+                                            onBiometricScanClick={(d) => setBiometricModalDeliveryId(d.id)}
+                                            onVerifyBiometrics={() => alert("Validação visual registrada.")}
+                                            onQRScanClick={(id) => setQrModalDeliveryId(id)}
+                                            onLiberateEntry={(id) => updateStatus(id, { status: 'inside', actor_role: 'concierge', notes: 'entry_liberated' })}
+                                        />
+                                    )) : (
+                                        <div className="text-center py-6 text-slate-600 flex flex-col items-center justify-center">
+                                            <DoorOpen className="w-10 h-10 mb-2 text-slate-800" />
+                                            <p className="text-xs">Nenhuma entrada.</p>
+                                        </div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         </div>
+
+                        {/* COL 2: CENTER (50%) - MAP + INSIDE */}
+                        <div className="w-2/4 flex flex-col h-full gap-4 lg:gap-6">
+                            {/* MAP (Top 2/3) */}
+                            <div className="flex-[2] flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm relative overflow-hidden group min-h-[300px]">
+                                <LiveMap
+                                    deliveries={deliveries}
+                                    gates={gates}
+                                    center={condoCenter}
+                                    condoPerimeter={condoPerimeter}
+                                    onMarkerDragEnd={(id, lat, lng) => {
+                                        const deliveryToUpdate = deliveries.find(d => d.id === id);
+                                        if (deliveryToUpdate) {
+                                            updateStatus(id, {
+                                                status: deliveryToUpdate.status,
+                                                driver_lat: lat,
+                                                driver_lng: lng
+                                            });
+                                        }
+                                    }}
+                                    onMarkerClick={(id, provider) => {
+                                        window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: id, provider } }));
+                                    }}
+                                />
+                            </div>
+
+                            {/* INSIDE QUEUE (Bottom 1/3) */}
+                            <div className="flex-[1] flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden min-h-[250px]">
+                                <div className="p-3 lg:p-4 border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-md">
+                                    <h3 className="text-sm font-bold text-slate-100 flex items-center justify-between uppercase tracking-wider">
+                                        <span>No Condomínio</span>
+                                        <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px]">{insideQueue.length}</span>
+                                    </h3>
+                                </div>
+                                <div className="p-4 overflow-y-auto space-y-3 flex-1 scrollbar-hide bg-slate-950/20">
+                                    <AnimatePresence mode="popLayout">
+                                        {insideQueue.length > 0 ? insideQueue.map(d => (
+                                            <ActiveProcessListItem
+                                                key={d.id}
+                                                delivery={d}
+                                                onRequestWhatsApp={() => { }}
+                                                onRequestPush={() => { }}
+                                                onPhoneCallClick={() => { }}
+                                                onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
+                                                onRecover={() => { }}
+                                                onLiberateEntry={() => { }}
+                                                onVerifyBiometrics={() => { }}
+                                            />
+                                        )) : (
+                                            <div className="text-center h-full flex flex-col items-center justify-center text-slate-600">
+                                                <p className="text-xs">Nenhum veículo no condomínio.</p>
+                                            </div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* COL 3: SAIDAS & HISTÓRICO (25%) */}
+                        <div className="w-1/4 flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden">
+                            <div className="p-4 border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-md">
+                                <h2 className="text-base lg:text-lg font-bold text-slate-100 flex items-center space-x-2">
+                                    <span>Saídas</span>
+                                </h2>
+                            </div>
+
+                            <div className="p-4 overflow-y-auto space-y-4 flex-1 scrollbar-hide">
+                                <AnimatePresence mode="popLayout">
+                                    {saidasQueue.length > 0 && (
+                                        <div className="mb-4">
+                                            <h3 className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider flex items-center justify-between">
+                                                <span>Finalizados</span>
+                                                <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px]">{saidasQueue.length}</span>
+                                            </h3>
+                                            <div className="space-y-3">
+                                                {saidasQueue.map(d => (
+                                                    <ActiveProcessListItem
+                                                        key={d.id}
+                                                        delivery={d}
+                                                        onRequestWhatsApp={() => { }}
+                                                        onRequestPush={() => { }}
+                                                        onPhoneCallClick={() => { }}
+                                                        onExitManual={() => { }}
+                                                        onRecover={(id) => {
+                                                            updateStatus(id, { status: 'inside', actor_role: 'concierge', notes: 'recovered_exit' });
+                                                        }}
+                                                        onLiberateEntry={() => { }}
+                                                        onVerifyBiometrics={() => { }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {trashQueue.length > 0 && (
+                                        <div className="pt-2 border-t border-slate-800/50">
+                                            <h3 className="text-xs font-bold text-rose-500/80 mb-2 uppercase tracking-wider flex items-center justify-between">
+                                                <span>Acessos Negados</span>
+                                                <span className="bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded-full text-[10px]">{trashQueue.length}</span>
+                                            </h3>
+                                            <div className="space-y-3 opacity-75">
+                                                {trashQueue.map(d => (
+                                                    <ActiveProcessListItem
+                                                        key={d.id}
+                                                        delivery={d}
+                                                        onRequestWhatsApp={() => { }}
+                                                        onRequestPush={() => { }}
+                                                        onPhoneCallClick={() => { }}
+                                                        onRecover={(id) => {
+                                                            updateStatus(id, { status: 'at_gate', request_channels: ['recovered'], notes: 'recovered_from_trash' });
+                                                        }}
+                                                        onLiberateEntry={() => { }}
+                                                        onVerifyBiometrics={() => { }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {saidasQueue.length === 0 && trashQueue.length === 0 && (
+                                        <div className="text-center py-10 text-slate-600 flex flex-col items-center justify-center">
+                                            <p className="text-sm">Nenhuma saída ou negação recente.</p>
+                                        </div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+
                     </div>
                 </main>
             </div>
@@ -300,23 +358,37 @@ const Concierge: React.FC = () => {
                 isOpen={!!whatsappModalDeliveryId}
                 onClose={() => setWhatsappModalDeliveryId(null)}
                 delivery={deliveries.find(d => d.id === whatsappModalDeliveryId) || null}
+                onSuccess={() => fetchDeliveries()}
             />
 
             <PushAppSimulatorModal
                 isOpen={!!pushModalDeliveryId}
                 onClose={() => setPushModalDeliveryId(null)}
                 delivery={deliveries.find(d => d.id === pushModalDeliveryId) || null}
+                onSuccess={() => fetchDeliveries()}
+            />
+
+            <BiometricScannerModal
+                isOpen={!!biometricModalDeliveryId}
+                onClose={() => setBiometricModalDeliveryId(null)}
+                condoId={selectedCondo || ''}
+                deliveryId={biometricModalDeliveryId || ''}
+                driverName={deliveries.find(d => d.id === biometricModalDeliveryId)?.driver_snapshot.name || 'Desconhecido'}
+                onSuccess={() => {
+                    if (biometricModalDeliveryId) updateStatus(biometricModalDeliveryId, { status: 'inside' });
+                    setBiometricModalDeliveryId(null);
+                }}
             />
 
             <QRScannerModal
                 isOpen={!!qrModalDeliveryId}
                 onClose={() => setQrModalDeliveryId(null)}
                 condoId={selectedCondo || ''}
-                onSuccess={() => setQrModalDeliveryId(null)}
+                onSuccess={() => fetchDeliveries()}
             />
 
             {/* New Flow: Sales Demo Injector opens simulator modal directly */}
-            <SalesDemoInjector />
+            <SalesDemoInjector onDeliveryChange={() => fetchDeliveries()} />
         </div>
     );
 };
