@@ -12,6 +12,8 @@ export interface Condo {
     zip_code?: string;
     lat?: number;
     lng?: number;
+    condo_type?: 'vertical' | 'horizontal' | 'mixed';
+    delivery_policy?: 'driver_enters' | 'driver_waits' | 'lockers';
     created_at: string;
 }
 
@@ -44,6 +46,8 @@ export const condoService = {
             zip_code: data.zip_code,
             lat: data.lat,
             lng: data.lng,
+            condo_type: data.condo_type,
+            delivery_policy: data.delivery_policy,
             perimeter_points: data.perimeter
         };
 
@@ -74,6 +78,8 @@ export const condoService = {
             zip_code: data.zip_code,
             lat: data.lat,
             lng: data.lng,
+            condo_type: data.condo_type,
+            delivery_policy: data.delivery_policy,
             perimeter_points: data.perimeter
         };
 

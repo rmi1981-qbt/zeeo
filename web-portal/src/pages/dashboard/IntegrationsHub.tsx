@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
     Store, Zap, Video,
     Smartphone, Search,
-    ChevronRight, CheckCircle2, Settings, X, BookOpen, ShieldAlert
+    ChevronRight, CheckCircle2, Settings, X, BookOpen, ShieldAlert, Tag
 } from 'lucide-react';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -111,6 +111,18 @@ const INTEGRATIONS: Integration[] = [
         color: 'from-slate-100/10 to-slate-400/10',
         borderColor: 'border-slate-400/30',
         features: ['Sincronia de Placas', 'Geofencing Preditivo', 'Biometria Federada (App Solicitante)']
+    },
+    {
+        id: 'location_tags',
+        name: 'Rastreadores / TAGs Internas',
+        category: 'Controle de Acesso / Logística',
+        type: 'local_system',
+        description: 'Vínculo de TAGs físicas com entregadores não rastreados por app.',
+        status: 'available',
+        icon: <Tag size={32} className="text-orange-500" />,
+        color: 'from-orange-500/20 to-amber-600/20',
+        borderColor: 'border-orange-500/30',
+        features: ['Rastreio Indoor Físico', 'Vínculo de Portaria Rápido', 'Gestão de Inventário de TAGs']
     }
 ];
 
@@ -272,16 +284,18 @@ const IntegrationsHub: React.FC = () => {
 
                             <div className="flex justify-between items-start mb-2">
                                 <h3 className="text-2xl font-bold text-white mb-2">{integration.name}</h3>
-                                <button
-                                    onClick={() => {
-                                        setSelectedDocIntegration(integration);
-                                        setIsApiDocOpen(true);
-                                    }}
-                                    className="p-2 bg-slate-800/50 hover:bg-blue-600/20 text-slate-400 hover:text-blue-400 border border-slate-700 hover:border-blue-500/50 rounded-xl transition-all"
-                                    title={`Documentação da API para ${integration.name}`}
-                                >
-                                    <BookOpen size={18} />
-                                </button>
+                                {integration.id !== 'location_tags' && (
+                                    <button
+                                        onClick={() => {
+                                            setSelectedDocIntegration(integration);
+                                            setIsApiDocOpen(true);
+                                        }}
+                                        className="p-2 bg-slate-800/50 hover:bg-blue-600/20 text-slate-400 hover:text-blue-400 border border-slate-700 hover:border-blue-500/50 rounded-xl transition-all"
+                                        title={`Documentação da API para ${integration.name}`}
+                                    >
+                                        <BookOpen size={18} />
+                                    </button>
+                                )}
                             </div>
                             <p className="text-sm text-primary-300 font-medium mb-4">{integration.category}</p>
 
@@ -301,7 +315,29 @@ const IntegrationsHub: React.FC = () => {
 
                             {/* Action Buttons */}
                             <div className="mt-auto pt-4 border-t border-slate-800/50">
-                                {(integration.type === 'local_system' || integration.type === 'local_communication') ? (
+                                {integration.id === 'location_tags' ? (
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl border border-slate-700/50">
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-200">Requerer TAG</div>
+                                                <div className="text-[10px] text-slate-500">Obrigatório na portaria.</div>
+                                            </div>
+                                            <div
+                                                onClick={() => toggleIntegrationStatus(integration.id, integration.status === 'connected' ? 'available' : 'connected')}
+                                                className={`w-10 h-5 rounded-full relative cursor-pointer flex items-center px-1 transition-colors ${integration.status === 'connected' ? 'bg-blue-600' : 'bg-slate-700'}`}
+                                            >
+                                                <div className={`w-3 h-3 rounded-full bg-white absolute transition-all ${integration.status === 'connected' ? 'right-1' : 'left-1'}`}></div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setActiveConfigModal(integration)}
+                                            className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Settings size={16} />
+                                            Gerenciar Inventário
+                                        </button>
+                                    </div>
+                                ) : (integration.type === 'local_system' || integration.type === 'local_communication') ? (
                                     // Ações para integrações focadas em ERP/Comunicação Híbrida
                                     <button
                                         onClick={() => setActiveConfigModal(integration)}

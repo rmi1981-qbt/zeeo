@@ -10,6 +10,7 @@ import { WhatsAppSimulatorModal } from '../components/Gatekeeper/WhatsAppSimulat
 import { PushAppSimulatorModal } from '../components/Gatekeeper/PushAppSimulatorModal';
 import { BiometricScannerModal } from '../components/Gatekeeper/BiometricScannerModal';
 import { QRScannerModal } from '../components/Gatekeeper/QRScannerModal';
+import { LocationTagAssignmentModal } from '../components/Gatekeeper/LocationTagAssignmentModal';
 import { Search, DoorOpen } from 'lucide-react';
 import { SalesDemoInjector } from '../components/SalesDemoInjector';
 
@@ -29,6 +30,10 @@ const Concierge: React.FC = () => {
     const [pushModalDeliveryId, setPushModalDeliveryId] = useState<string | null>(null);
     const [biometricModalDeliveryId, setBiometricModalDeliveryId] = useState<string | null>(null);
     const [qrModalDeliveryId, setQrModalDeliveryId] = useState<string | null>(null);
+    const [tagModalDeliveryId, setTagModalDeliveryId] = useState<string | null>(null);
+
+    // Mock Feature Flag from Condo Config
+    const [requireLocationTags] = useState(true);
 
     const handlePhoneCallSubmit = async (outcome: PhoneCallOutcome) => {
         if (!phoneModalDeliveryId) return;
@@ -200,7 +205,13 @@ const Concierge: React.FC = () => {
                                             onBiometricScanClick={(d) => setBiometricModalDeliveryId(d.id)}
                                             onVerifyBiometrics={() => alert("Validação visual registrada.")}
                                             onQRScanClick={(id) => setQrModalDeliveryId(id)}
-                                            onLiberateEntry={(id) => updateStatus(id, { status: 'inside', actor_role: 'concierge', notes: 'entry_liberated' })}
+                                            onLiberateEntry={(id) => {
+                                                if (requireLocationTags) {
+                                                    setTagModalDeliveryId(id);
+                                                } else {
+                                                    updateStatus(id, { status: 'inside', actor_role: 'concierge', notes: 'entry_liberated' });
+                                                }
+                                            }}
                                         />
                                     )) : (
                                         <div className="text-center py-6 text-slate-600 flex flex-col items-center justify-center">
@@ -385,6 +396,22 @@ const Concierge: React.FC = () => {
                 onClose={() => setQrModalDeliveryId(null)}
                 condoId={selectedCondo || ''}
                 onSuccess={() => fetchDeliveries()}
+            />
+
+            <LocationTagAssignmentModal
+                isOpen={!!tagModalDeliveryId}
+                onClose={() => setTagModalDeliveryId(null)}
+                delivery={deliveries.find(d => d.id === tagModalDeliveryId) || null}
+                onSubmit={(tagId) => {
+                    if (tagModalDeliveryId) {
+                        updateStatus(tagModalDeliveryId, {
+                            status: 'inside',
+                            actor_role: 'concierge',
+                            notes: `entry_liberated_with_tag_${tagId}`
+                        });
+                    }
+                    setTagModalDeliveryId(null);
+                }}
             />
 
             {/* New Flow: Sales Demo Injector opens simulator modal directly */}

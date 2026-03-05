@@ -20,6 +20,16 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
     };
 
     const endpoints: Record<string, any> = {
+        'get_geo_index': {
+            supported_integrations: ['ifood', 'mercadolivre', 'uber', 'app_condominio'],
+            title: 'Geo-Index Sync (Perímetros)',
+            method: 'GET',
+            path: '/hub/geo-index',
+            desc: 'Retorna a lista de todos os condomínios parceiros ativos, incluindo seus perímetros (GeoJSON), tipo de condomínio e política de entrega. Ideal para criar cercas virtuais no seu app e disparar a autorização de forma preditiva.',
+            payload: `// Não é necessário payload (GET Request)`,
+            curl: `curl -X GET https://api.zeeo.com.br/hub/geo-index \\
+  -H "x-api-key: ${hubProviderKey}"`
+        },
         'send_approval': {
             supported_integrations: ['app_condominio', 'whatsapp'],
             title: 'Enviar Aprovação do Morador',
@@ -213,6 +223,19 @@ export const ApiDocumentationModal: React.FC<ApiDocumentationModalProps> = ({ is
                                         </div>
                                         <div className="font-semibold text-sm">Enviar Aprovação</div>
                                         <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/webhook/approval</div>
+                                    </button>
+                                )}
+
+                                {availableEndpoints.includes('get_geo_index') && (
+                                    <button
+                                        onClick={() => setActiveEndpoint('get_geo_index')}
+                                        className={`w-full text-left p-3 rounded-lg border transition-all ${activeEndpoint === 'get_geo_index' ? 'bg-blue-900/20 border-blue-500/50 text-blue-100' : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-800'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">GET</span>
+                                        </div>
+                                        <div className="font-semibold text-sm">Geo-Index Sync</div>
+                                        <div className="text-[10px] text-slate-500 font-mono mt-1 w-full truncate">/hub/geo-index</div>
                                     </button>
                                 )}
 

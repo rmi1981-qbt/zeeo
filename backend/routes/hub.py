@@ -53,6 +53,46 @@ async def verify_provider_api_key(x_api_key: str = Header(...)):
     return res.data[0]
 
 
+@router.get("/geo-index")
+async def get_geo_index(provider_info: dict = Depends(verify_provider_api_key)):
+    """
+    Returns a list of all active partner condominiums and their geographical boundaries.
+    Used by Logistics Partners (e.g., iFood) to synchronize their local geo-fences
+    and trigger the pre-authorization flow only when drivers are approaching SaFE-enabled condos.
+    """
+    try:
+        # We need to fetch the perimeter. Since it's stored as PostGIS geography, 
+        # we can get the GeoJSON representation if we've set up a view or RPC in Supabase, 
+        # but the standard REST API returns it usually as WKB or we need an RPC.
+        # Alternatively, since we store perimeter_points in the frontend, if we stored them 
+        # or if we have a raw view, we can return it.
+        # Assuming the REST API returns the perimeter as a dict (GeoJSON) or WKB string.
+        # We will also return the new policy fields.
+        
+        res = supabase.table('condominiums').select('id, name, perimeter, condo_type, delivery_policy').execute()
+        
+        condos_data = []
+        for c in res.data:
+            condos_data.append({
+                "condo_id": c["id"],
+                "name": c["name"],
+                "geo_polygon": c.get("perimeter"), # This will be the PostGIS representation
+                "condo_type": c.get("condo_type", "horizontal"),
+                "delivery_policy": c.get("delivery_policy", "driver_waits")
+            })
+            
+        return {
+            "status": "success",
+            "provider": provider_info["name"],
+            "total_condos": len(condos_data),
+            "data": condos_data
+        }
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print("GEO-INDEX ERROR:", err_msg, flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/inbound/{provider}/delivery")
 async def create_inbound_delivery(
     provider: str,

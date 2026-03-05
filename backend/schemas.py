@@ -16,6 +16,10 @@ class CondoBase(BaseModel):
     # and converted to WKT in the backend logic, or passed as raw depending on strategy.
     # Let's align with current frontend which sends { perimeter: { lat: number, lng: number }[] }
     perimeter_points: Optional[List[Any]] = None 
+    require_location_tags: Optional[bool] = False
+
+    condo_type: Optional[str] = 'horizontal'
+    delivery_policy: Optional[str] = 'driver_waits'
 
 class CondoCreate(CondoBase):
     pass
@@ -55,6 +59,33 @@ class Resident(ResidentBase):
     id: str
     created_at: datetime
 
+# --- Location Tags Schemas ---
+
+class LocationTagBase(BaseModel):
+    condominium_id: str
+    brand: str
+    model: str
+    factory_id: str
+    system_id: str # XYY format
+    status: Optional[str] = 'available'
+
+class LocationTagCreate(LocationTagBase):
+    pass
+
+class LocationTagUpdate(BaseModel):
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    factory_id: Optional[str] = None
+    system_id: Optional[str] = None
+    status: Optional[str] = None
+
+class LocationTag(LocationTagBase):
+    id: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # --- Delivery Schemas ---
 
 class DeliveryBase(BaseModel):
@@ -69,6 +100,7 @@ class DeliveryBase(BaseModel):
     driver_lat: Optional[float] = None
     driver_lng: Optional[float] = None
     eta: Optional[datetime] = None
+    location_tag_id: Optional[str] = None
 
 class DeliveryCreate(DeliveryBase):
     pass
@@ -90,6 +122,7 @@ class DeliveryUpdate(BaseModel):
     gate_name: Optional[str] = None
     notes: Optional[str] = None
     request_channels: Optional[List[str]] = None # Tracks channels used to request auth (e.g. ['whatsapp', 'push'])
+    location_tag_id: Optional[str] = None
 
 class GateInfo(BaseModel):
     id: str

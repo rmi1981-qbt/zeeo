@@ -232,6 +232,8 @@ export default function CondominiumSettings() {
                 zip_code: condo.zip_code || undefined,
                 lat: mapCenter?.lat,
                 lng: mapCenter?.lng,
+                condo_type: condo.condo_type,
+                delivery_policy: condo.delivery_policy,
                 perimeter: perimeterPath
             });
 
@@ -372,6 +374,52 @@ export default function CondominiumSettings() {
                                 className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
                                 style={{ maxWidth: '200px' }}
                             />
+                        </div>
+
+                        {/* Regras do Condomínio (Geo-Index) */}
+                        <div className="pt-6 border-t border-slate-800">
+                            <h3 className="text-lg font-semibold text-white mb-4">Regras e Políticas de Entrega</h3>
+                            <p className="text-sm text-slate-400 mb-6">
+                                Estas configurações estruturais criam o perfil do condomínio para os aplicativos parceiros de logística (Geo-Index Sync), determinando os alertas que os entregadores recebem antes de chegarem à portaria.
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-2">Estrutura do Condomínio</label>
+                                    <div className="relative">
+                                        <select
+                                            value={condo.condo_type || 'horizontal'}
+                                            onChange={e => setCondo({ ...condo, condo_type: e.target.value as 'vertical' | 'horizontal' | 'mixed' })}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none pr-10"
+                                        >
+                                            <option value="horizontal">Horizontal (Casas / Lotes)</option>
+                                            <option value="vertical">Vertical (Prédios / Apartamentos)</option>
+                                            <option value="mixed">Misto (Prédios e Casas)</option>
+                                        </select>
+                                        <div className="absolute top-3.5 right-3 pointer-events-none text-slate-500">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-400 mb-2">Política Padrão de Entrega</label>
+                                    <div className="relative">
+                                        <select
+                                            value={condo.delivery_policy || 'driver_waits'}
+                                            onChange={e => setCondo({ ...condo, delivery_policy: e.target.value as 'driver_waits' | 'driver_enters' | 'lockers' })}
+                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none appearance-none pr-10"
+                                        >
+                                            <option value="driver_waits">Motorista aguarda o morador descer à portaria</option>
+                                            <option value="driver_enters">Motorista é liberado para entrar (até a porta)</option>
+                                            <option value="lockers">Motorista deixa o pedido em Armários Inteligentes (Smart Lockers)</option>
+                                        </select>
+                                        <div className="absolute top-3.5 right-3 pointer-events-none text-slate-500">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Mapa de Perímetro */}
