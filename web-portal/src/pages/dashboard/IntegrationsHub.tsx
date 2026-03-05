@@ -302,16 +302,16 @@ const IntegrationsHub: React.FC = () => {
                             {/* Action Buttons */}
                             <div className="mt-auto pt-4 border-t border-slate-800/50">
                                 {(integration.type === 'local_system' || integration.type === 'local_communication') ? (
-                                    // Ações para integrações locais (Requerem configurações via Webhook ou Keys)
+                                    // Ações para integrações focadas em ERP/Comunicação Híbrida
                                     <button
                                         onClick={() => setActiveConfigModal(integration)}
                                         className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all flex items-center justify-center group"
                                     >
                                         <Settings size={18} className="mr-2" />
-                                        Configurar Conexão Local
+                                        {currentView === 'hub' ? 'Configurar Provedor Central' : 'Configurar Conexão'}
                                     </button>
                                 ) : (
-                                    // Ações para integrações globais e biométricas
+                                    // Ações para integrações globais e biométricas puros
                                     integration.status === 'connected' ? (
                                         <div className="space-y-3">
                                             <button
@@ -319,7 +319,7 @@ const IntegrationsHub: React.FC = () => {
                                                 className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Settings size={16} />
-                                                Gerenciar Funcionalidades
+                                                {currentView === 'hub' ? 'Gerenciar Hub API Keys' : 'Gerenciar Recebimento'}
                                             </button>
                                             {integration.type === 'global_biometrics' && currentView === 'condo' && (
                                                 <button
@@ -341,7 +341,7 @@ const IntegrationsHub: React.FC = () => {
                                             onClick={() => toggleIntegrationStatus(integration.id, 'connected')}
                                             className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 shadow-[0_0_20px_rgba(var(--primary-500),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary-500),0.5)] transition-all flex items-center justify-center group"
                                         >
-                                            Autorizar Conexão
+                                            {currentView === 'hub' ? 'Habilitar Hub Global' : 'Autorizar Recebimento'}
                                             <ChevronRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
                                         </button>
                                     )
@@ -381,6 +381,7 @@ const IntegrationsHub: React.FC = () => {
                 onClose={() => setActiveConfigModal(null)}
                 integration={activeConfigModal}
                 condoId={selectedCondo}
+                currentView={currentView}
             />
 
             {/* Modal de Prioridade Biométrica (Mock Visual) */}

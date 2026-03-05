@@ -9,6 +9,7 @@ interface IntegrationConfigModalProps {
     onClose: () => void;
     integration: Integration | null;
     condoId: string | null;
+    currentView: 'hub' | 'delivery' | 'condo';
 }
 
 // Map endpoints/capabilities to integrations (Mocking Backend Configs)
@@ -45,9 +46,10 @@ const CAPABILITIES_MAP: Record<string, { id: string, name: string, description: 
     ]
 };
 
-export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ isOpen, onClose, integration, condoId }) => {
+export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ isOpen, onClose, integration, condoId, currentView }) => {
     const [capabilities, setCapabilities] = useState<{ [key: string]: boolean }>({});
     const [saving, setSaving] = useState(false);
+    const [connectionMode, setConnectionMode] = useState<'hub_partner' | 'direct'>('hub_partner');
 
     // Initialize capabilities when opening
     useEffect(() => {
@@ -58,6 +60,9 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
                 initialCaps[cap.id] = cap.defaultOn;
             });
             setCapabilities(initialCaps);
+
+            // Reset connection mode
+            setConnectionMode('hub_partner');
         }
     }, [integration, isOpen]);
 
@@ -73,6 +78,10 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
 
     const availableCaps = CAPABILITIES_MAP[integration.id] || [];
     const hasWebhooks = availableCaps.some(c => c.reqWebhook);
+    const isHybridComm = integration.type === 'local_system' || integration.type === 'local_communication';
+
+    // Webhooks should only be configured if Hub Admin assigns them globally, or Condo assigns them directly (via direct P2P).
+    const showWebhooks = hasWebhooks && (currentView === 'hub' || (currentView === 'condo' && connectionMode === 'direct'));
 
     return (
         <AnimatePresence>
@@ -110,13 +119,58 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 bg-slate-950">
+                        {/* Tipo de Conexão Section (Hybrid Comms for Condos) */}
+                        {currentView === 'condo' && isHybridComm && (
+                            <div className="mb-8 p-6 bg-slate-900 border border-slate-800 rounded-xl relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
+                                <h3 className="text-lg font-bold text-white mb-2">Modelo de Conexão</h3>
+                                <p className="text-sm text-slate-400 mb-6">Escolha como o seu condomínio se conectará a este serviço.</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div
+                                        onClick={() => setConnectionMode('hub_partner')}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${connectionMode === 'hub_partner' ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'}`}
+                                    >
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${connectionMode === 'hub_partner' ? 'border-blue-500' : 'border-slate-500'}`}>
+                                                {connectionMode === 'hub_partner' && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                                            </div>
+                                            <h4 className="font-bold text-slate-200">Usar Parceiro Zeeo (Centralizado)</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-400 pl-7">Conexão simplificada e homologada através do Zeeo Hub. Requer apenas identificação básica.</p>
+                                    </div>
+
+                                    <div
+                                        onClick={() => setConnectionMode('direct')}
+                                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${connectionMode === 'direct' ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]' : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'}`}
+                                    >
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${connectionMode === 'direct' ? 'border-blue-500' : 'border-slate-500'}`}>
+                                                {connectionMode === 'direct' && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+                                            </div>
+                                            <h4 className="font-bold text-slate-200">Conexão Própria (Ponta a Ponta)</h4>
+                                        </div>
+                                        <p className="text-xs text-slate-400 pl-7">Para condomínios que possuem seus próprios contratos e provedores técnicos independentes da Zeeo.</p>
+                                    </div>
+                                </div>
+
+                                {connectionMode === 'hub_partner' && (
+                                    <div className="mt-6 pt-6 border-t border-slate-800">
+                                        <label className="block text-sm font-medium text-slate-300 mb-2">Identificador do Condomínio no Parceiro</label>
+                                        <input type="text" placeholder={integration.id === 'whatsapp' ? '+55 (11) 99999-9999' : 'Ex: ID do Condomínio ou CNPJ'} className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                                        <p className="text-xs text-slate-500 mt-2">Você utilizará a conexão estabelecida pelo Hub Zeeo de forma transparente.</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Capabilities Section */}
                         <div className="mb-8">
                             <div className="flex items-center gap-2 mb-4">
                                 <Activity className="text-blue-400" size={20} />
-                                <h3 className="text-lg font-bold text-slate-200">Capacidades e Endpoints</h3>
+                                <h3 className="text-lg font-bold text-slate-200">Funcionalidades Ativas</h3>
                             </div>
-                            <p className="text-sm text-slate-400 mb-6">Ative ou desative capacidades específicas. Endpoints desativados retornarão erro 403 (Forbidden).</p>
+                            <p className="text-sm text-slate-400 mb-6">Ative ou desative capacidades específicas que deseja receber e enviar para este provedor.</p>
 
                             <div className="space-y-3">
                                 {availableCaps.length > 0 ? (
@@ -127,7 +181,7 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
                                                     <h4 className="font-semibold text-slate-200">{cap.name}</h4>
                                                     {cap.reqWebhook && (
                                                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase tracking-wider">
-                                                            Requer Webhook
+                                                            {connectionMode === 'direct' ? 'Requer Webhook Local' : (isHybridComm ? 'Webhook Centralizado No Hub' : 'Requer Webhook')}
                                                         </span>
                                                     )}
                                                 </div>
@@ -161,23 +215,39 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
                         </div>
 
                         {/* Configurações Locais / Webhooks Section */}
-                        {hasWebhooks && (
+                        {showWebhooks && (
                             <div className="mb-4">
                                 <div className="flex items-center gap-2 mb-4 border-t border-slate-800 pt-8">
                                     <Link2 className="text-emerald-400" size={20} />
-                                    <h3 className="text-lg font-bold text-slate-200">Roteamento (Webhooks)</h3>
+                                    <h3 className="text-lg font-bold text-slate-200">
+                                        Roteamento (Webhooks da Conexão {currentView === 'hub' ? 'Global' : 'Ponta a Ponta'})
+                                    </h3>
                                 </div>
-                                <p className="text-sm text-slate-400 mb-6">Esta integração requer que o Zeeo envie dados (Outbound). Configure o destino.</p>
+                                <p className="text-sm text-slate-400 mb-6">Esta integração requer que enviemos dados (Outbound). Configure as chaves oficiais e destino em sua infraestrutura.</p>
 
                                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                                     {condoId && <CondominiumWebhookConfig condoId={condoId} />}
+
+                                    <div className="mt-8 border-t border-slate-800 pt-6">
+                                        <h4 className="text-md font-bold text-slate-200 mb-4">Chaves de Acesso da API do Provedor</h4>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-300 mb-2">API Key</label>
+                                                <input type="password" placeholder="••••••••••••••••••••••••" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-all font-mono" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-300 mb-2">Client Secret / Secret Key</label>
+                                                <input type="password" placeholder="••••••••••••••••••••••••" className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-all font-mono" />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+                    <div className="p-6 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3 shrink-0">
                         <button
                             onClick={onClose}
                             className="px-6 py-2.5 rounded-xl font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
@@ -192,12 +262,12 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
                             {saving ? (
                                 <>
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    Salvando...
+                                    <span className="ml-2">Aplicando...</span>
                                 </>
                             ) : (
                                 <>
                                     <Save size={18} />
-                                    Salvar Alterações
+                                    <span>Salvar Configuração</span>
                                 </>
                             )}
                         </button>
