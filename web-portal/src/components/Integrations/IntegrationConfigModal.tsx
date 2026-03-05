@@ -37,7 +37,7 @@ const CAPABILITIES_MAP: Record<string, { id: string, name: string, description: 
     ],
     'erp': [
         { id: 'sync_residents', name: 'Sincronizar Banco de Moradores', description: 'Manter a lista de blocos, unidades e CPFs espelhada com o ERP local.', defaultOn: true, reqWebhook: true },
-        { id: 'gate_events', name: 'Eventos de Portaria', description: 'Avisar o ERP quando um processo de entrada ou saída for concluído na SaFE.', defaultOn: false, reqWebhook: true }
+        { id: 'gate_events', name: 'Eventos de Portaria', description: 'Avisar o ERP quando um processo de entrada ou saída for concluído no Zeeo.', defaultOn: false, reqWebhook: true }
     ],
     'intelbras': [
         { id: 'logical_open', name: 'Abertura Lógica de Catracas', description: 'Disparar acionamento de relê via rede local em totens.', defaultOn: true, reqWebhook: true },
@@ -167,7 +167,7 @@ export const IntegrationConfigModal: React.FC<IntegrationConfigModalProps> = ({ 
                                     <Link2 className="text-emerald-400" size={20} />
                                     <h3 className="text-lg font-bold text-slate-200">Roteamento (Webhooks)</h3>
                                 </div>
-                                <p className="text-sm text-slate-400 mb-6">Esta integração requer que a SaFE envie dados (Outbound). Configure o destino.</p>
+                                <p className="text-sm text-slate-400 mb-6">Esta integração requer que o Zeeo envie dados (Outbound). Configure o destino.</p>
 
                                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                                     {condoId && <CondominiumWebhookConfig condoId={condoId} />}
