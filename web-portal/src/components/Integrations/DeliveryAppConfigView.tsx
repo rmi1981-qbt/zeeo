@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Link2, Key, ShieldCheck, Cpu } from 'lucide-react';
-import { CondominiumWebhookConfig } from './CondominiumWebhookConfig'; // Reusing this for outbound webhooks
+import { Link2, Key, ShieldCheck } from 'lucide-react';
 
 export const DeliveryAppConfigView: React.FC = () => {
     const [webhookUrl, setWebhookUrl] = useState('');
