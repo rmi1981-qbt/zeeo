@@ -20,6 +20,7 @@ interface ActiveProcessListItemProps {
     onQRScanClick?: (deliveryId: string) => void;
     onVerifyBiometrics?: (id: string) => void;
     onLiberateEntry?: (id: string) => void;
+    onCardClick?: (id: string) => void;
 }
 
 export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
@@ -32,7 +33,8 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onBiometricScanClick,
     onQRScanClick,
     onVerifyBiometrics,
-    onLiberateEntry
+    onLiberateEntry,
+    onCardClick
 }) => {
     const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by && delivery.status !== 'pre_authorized');
     const isConflict = delivery.status === 'conflicting';
@@ -41,6 +43,9 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
     const isExited = delivery.status === 'exited';
     const isInside = delivery.status === 'inside';
+
+    const activeAlerts = delivery.active_alerts || [];
+    const hasGatekeeperAlerts = activeAlerts.some(a => a.target === 'gatekeeper');
 
     const hasWhatsApp = delivery.request_channels?.includes('whatsapp');
     const hasPush = delivery.request_channels?.includes('push');
@@ -80,8 +85,10 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
+            onClick={() => onCardClick?.(delivery.id)}
             className={cn(
                 "relative overflow-hidden rounded-xl border p-4 transition-all duration-300",
+                onCardClick && "cursor-pointer hover:ring-2 hover:ring-blue-500/50",
                 cardColorClasses
             )}
         >
@@ -105,18 +112,28 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                     </div>
                 </div>
 
-                <div className="flex flex-col items-end">
-                    {delivery.location ? (
-                        <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-primary-400 font-bold">
-                            <Navigation size={12} />
-                            <span>{delivery.target_unit_label}</span>
-                        </div>
-                    ) : (
-                        <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-slate-500 font-bold">
+                <div className="flex flex-col items-end gap-1.5">
+                    {/* Always show the Target Unit */}
+                    <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-primary-400 font-bold border border-primary-500/20">
+                        <Navigation size={12} />
+                        <span>{delivery.target_unit_label || 'Destino Desconhecido'}</span>
+                    </div>
+                    
+                    {/* If no location, show the Open Driver App button clearly */}
+                    {!delivery.location && (
+                        <button 
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: delivery.id, provider: delivery.provider } }));
+                            }}
+                            className="flex items-center space-x-1 hover:bg-slate-800 bg-slate-900/50 px-2 py-1 rounded text-slate-400 hover:text-white font-bold transition-colors cursor-pointer border border-slate-700/50 hover:border-slate-500 shadow-sm"
+                            title="Abrir App do Motorista (Simulador)"
+                        >
                             <MapPinOff size={12} />
-                            <span className="text-[10px]">Sem GPS</span>
-                        </div>
+                            <span className="text-[10px]">Sem GPS - App Motorista</span>
+                        </button>
                     )}
+                    
                     {/* Status Badge */}
                     <div className="mt-1 flex justify-end">
                         {isExited && <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saída Liberada</span>}
@@ -126,6 +143,21 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                         {isConflict && <span className="text-[10px] text-orange-400 font-bold uppercase tracking-wider flex items-center gap-1"><AlertTriangle size={10} /> Conflito de Respostas</span>}
                         {isPending && !isConflict && !isPreAuthorizedFallback && <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Aguardando Morador</span>}
                     </div>
+
+                    {/* Active Alerts */}
+                    {hasGatekeeperAlerts && (
+                        <div className="flex flex-col gap-1 items-end mt-1">
+                            {activeAlerts.filter(a => a.target === 'gatekeeper').map(alert => (
+                                <div key={alert.id} className={cn(
+                                    "flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold shadow-sm whitespace-nowrap",
+                                    alert.type === 'warning' ? "bg-rose-500/20 text-rose-400 border border-rose-500/30 animate-pulse" : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                )} title={alert.message}>
+                                    {alert.type === 'warning' ? <AlertTriangle size={12} /> : <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />}
+                                    {alert.message}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 

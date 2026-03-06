@@ -10,6 +10,8 @@ from shapely.geometry import Point, mapping
 import binascii
 
 from utils.delivery_helpers import parse_location, log_delivery_event, check_gate_proximity, generate_zeeo_code
+import asyncio
+from utils.alert_engine import process_delivery_alerts
 
 router = APIRouter(prefix="/deliveries", tags=["deliveries"])
 @router.get("/active", response_model=list[schemas.Delivery])
@@ -313,6 +315,19 @@ def update_delivery_status(delivery_id: str, status_update: schemas.DeliveryUpda
                 status_update=status_update,
                 target_unit=result.get('unit')
             )
+
+        # Process alerts
+        condo_res = supabase.table('condominiums').select('*').eq('id', result['condo_id']).execute()
+        if condo_res.data:
+            condo_data = condo_res.data[0]
+            # Process synchronously as fastapi endpoint is synchronous right now
+            try:
+                # To call an async function within a synchronous route, we use asyncio event loop
+                # The alert engine updates the DB and returns new active_alerts to the response payload
+                new_alerts = asyncio.run(process_delivery_alerts(result, condo_data, supabase))
+                result['active_alerts'] = new_alerts
+            except Exception as ae:
+                print(f"⚠️ Error running alert engine: {ae}")
 
         # Check proximity to gates (logging for now)
         if lat and lng:

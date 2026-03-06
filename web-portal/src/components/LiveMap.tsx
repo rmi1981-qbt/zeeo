@@ -63,12 +63,20 @@ interface LiveMapProps {
     onMarkerClick?: (deliveryId: string, provider: string) => void;
     condoPerimeter?: { lat: number; lng: number }[];
     isPlacingItem?: boolean;
+    selectedDeliveryId?: string | null;
 }
 
 // Internal component for each marker to manage its own InfoWindow state
-const DeliveryMarker = ({ delivery, onDragEnd, onMarkerClick }: { delivery: Delivery, onDragEnd?: (id: string, lat: number, lng: number) => void, onMarkerClick?: (id: string, provider: string) => void }) => {
+const DeliveryMarker = ({ delivery, onDragEnd, onMarkerClick, isSelected }: { delivery: Delivery, onDragEnd?: (id: string, lat: number, lng: number) => void, onMarkerClick?: (id: string, provider: string) => void, isSelected?: boolean }) => {
     const [open, setOpen] = useState(false);
     const [markerRef, marker] = useAdvancedMarkerRef();
+
+    // Auto-open if selected externally
+    useEffect(() => {
+        if (isSelected !== undefined) {
+            setOpen(isSelected);
+        }
+    }, [isSelected]);
 
     const isAuthorized = delivery.status === 'authorized' || delivery.status === 'pre_authorized';
     const isDenied = delivery.status === 'denied' || delivery.status === 'rejected';
@@ -156,19 +164,22 @@ const DeliveryMarker = ({ delivery, onDragEnd, onMarkerClick }: { delivery: Deli
 };
 
 // Inner component to handle map updates
-const MapController = ({ center }: { center: { lat: number, lng: number } }) => {
+const MapController = ({ center, selectedDelivery }: { center: { lat: number, lng: number }, selectedDelivery?: Delivery }) => {
     const map = useMap();
 
     useEffect(() => {
-        if (map && center) {
+        if (map && selectedDelivery?.location) {
+            map.panTo({ lat: selectedDelivery.location.lat, lng: selectedDelivery.location.lng });
+            map.setZoom(18); // Zoom in closer on selection
+        } else if (map && center && !selectedDelivery) {
             map.panTo(center);
         }
-    }, [map, center]);
+    }, [map, center, selectedDelivery]);
 
     return null;
 };
 
-const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 }, onMarkerDragEnd, onMapClick, onMarkerClick, isPlacingItem, condoPerimeter }) => {
+const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { lat: -23.5505, lng: -46.6333 }, onMarkerDragEnd, onMapClick, onMarkerClick, isPlacingItem, condoPerimeter, selectedDeliveryId }) => {
     // Filter deliveries to show on map (Arriving and Inside)
     const mapDeliveries = deliveries.filter(d =>
         // Show everything that isn't completed or exited
@@ -213,7 +224,7 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                         }
                     }}
                 >
-                    <MapController center={center} />
+                    <MapController center={center} selectedDelivery={deliveries.find(d => d.id === selectedDeliveryId)} />
 
                     {/* Perimeter Polygon */}
                     {condoPerimeter && condoPerimeter.length > 0 && (
@@ -244,7 +255,7 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                     ))}
 
                     {mapDeliveries.map(d => (
-                        <DeliveryMarker key={d.id} delivery={d} onDragEnd={onMarkerDragEnd} onMarkerClick={onMarkerClick} />
+                        <DeliveryMarker key={d.id} delivery={d} onDragEnd={onMarkerDragEnd} onMarkerClick={onMarkerClick} isSelected={d.id === selectedDeliveryId} />
                     ))}
                 </Map>
 

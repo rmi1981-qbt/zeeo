@@ -11,6 +11,8 @@ import { ApiDocumentationModal } from '../../components/Integrations/ApiDocument
 import { IntegrationConfigModal } from '../../components/Integrations/IntegrationConfigModal';
 import { CondoSharingConfig } from '../../components/Integrations/CondoSharingConfig';
 import { DeliveryAppConfigView } from '../../components/Integrations/DeliveryAppConfigView';
+import { AlertSettingsConfig } from '../../components/Integrations/AlertSettingsConfig';
+import { HubOverviewGraph } from '../../components/Integrations/HubOverviewGraph';
 
 export type IntegrationType = 'global_logistics' | 'global_biometrics' | 'local_system' | 'local_communication';
 
@@ -126,14 +128,14 @@ const INTEGRATIONS: Integration[] = [
     }
 ];
 
-type ViewMode = 'hub' | 'delivery' | 'condo';
+type ViewMode = 'hub' | 'delivery' | 'condo' | 'ecosystem';
 
 const IntegrationsHub: React.FC = () => {
     const { selectedCondo, profile } = useAuth();
     const isSuperAdmin = profile?.is_platform_admin === true;
 
-    // For now, default purely based on super admin. If not super admin, assume condo admin.
-    const [currentView, setCurrentView] = useState<ViewMode>(isSuperAdmin ? 'hub' : 'condo');
+    // Default to the new 'ecosystem' view for super admins to showcase the graph initially
+    const [currentView, setCurrentView] = useState<ViewMode>(isSuperAdmin ? 'ecosystem' : 'condo');
 
     const [searchQuery, setSearchQuery] = useState('');
     const [isApiDocOpen, setIsApiDocOpen] = useState(false);
@@ -155,11 +157,18 @@ const IntegrationsHub: React.FC = () => {
         return (
             <div className="bg-slate-900 border border-slate-700/50 rounded-2xl p-2 mb-8 flex flex-wrap justify-center gap-2 relative z-20 overflow-x-auto custom-scrollbar">
                 <button
+                    onClick={() => setCurrentView('ecosystem')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap ${currentView === 'ecosystem' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+                >
+                    <Zap size={18} />
+                    Visão: Ecossistema
+                </button>
+                <button
                     onClick={() => setCurrentView('hub')}
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap ${currentView === 'hub' ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
                 >
                     <ShieldAlert size={18} />
-                    Visão: Hub Admin
+                    Visão: Hub Admin / Lista
                 </button>
                 <button
                     onClick={() => setCurrentView('delivery')}
@@ -173,7 +182,7 @@ const IntegrationsHub: React.FC = () => {
                     className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all whitespace-nowrap ${currentView === 'condo' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
                 >
                     <Store size={18} />
-                    Visão: Condomínio
+                    Visão: Condomínio Locais
                 </button>
             </div>
         );
@@ -241,7 +250,12 @@ const IntegrationsHub: React.FC = () => {
                 </motion.div>
             </div>
 
-            {currentView === 'condo' && <CondoSharingConfig />}
+            {currentView === 'condo' && selectedCondo && (
+                <>
+                    <AlertSettingsConfig condoId={selectedCondo} />
+                    <CondoSharingConfig />
+                </>
+            )}
 
             {/* Integrations Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 relative z-10 mt-10">
@@ -396,10 +410,16 @@ const IntegrationsHub: React.FC = () => {
             <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-primary-900/20 to-transparent pointer-events-none" />
             <div className="absolute top-20 right-20 w-96 h-96 bg-primary-600/10 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="max-w-7xl mx-auto relative z-10">
+            <div className={`mx-auto relative z-10 ${currentView === 'ecosystem' ? 'w-full px-2' : 'max-w-7xl'}`}>
                 <ViewSwitcher />
 
-                {currentView === 'delivery' ? (
+                {currentView === 'ecosystem' ? (
+                     <HubOverviewGraph 
+                        integrations={integrationsList} 
+                        onOpenConfig={(integration) => setActiveConfigModal(integration)}
+                        onToggleStatus={toggleIntegrationStatus}
+                     />
+                ) : currentView === 'delivery' ? (
                     <DeliveryAppConfigView />
                 ) : (
                     renderIntegrationsGrid()
@@ -417,7 +437,7 @@ const IntegrationsHub: React.FC = () => {
                 onClose={() => setActiveConfigModal(null)}
                 integration={activeConfigModal}
                 condoId={selectedCondo}
-                currentView={currentView}
+                currentView={currentView === 'ecosystem' ? 'hub' : currentView}
             />
 
             {/* Modal de Prioridade Biométrica (Mock Visual) */}

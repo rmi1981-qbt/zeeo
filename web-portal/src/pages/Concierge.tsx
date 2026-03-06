@@ -26,6 +26,7 @@ const Concierge: React.FC = () => {
 
     // Modal state
     const [phoneModalDeliveryId, setPhoneModalDeliveryId] = useState<string | null>(null);
+    const [selectedDeliveryId, setSelectedDeliveryId] = useState<string | null>(null);
     const [whatsappModalDeliveryId, setWhatsappModalDeliveryId] = useState<string | null>(null);
     const [pushModalDeliveryId, setPushModalDeliveryId] = useState<string | null>(null);
     const [biometricModalDeliveryId, setBiometricModalDeliveryId] = useState<string | null>(null);
@@ -198,6 +199,7 @@ const Concierge: React.FC = () => {
                                         <ActiveProcessListItem
                                             key={d.id}
                                             delivery={d}
+                                            onCardClick={(id) => setSelectedDeliveryId(prev => prev === id ? null : id)}
                                             onRequestWhatsApp={(id) => setWhatsappModalDeliveryId(id)}
                                             onRequestPush={(id) => setPushModalDeliveryId(id)}
                                             onPhoneCallClick={(id) => setPhoneModalDeliveryId(id)}
@@ -232,6 +234,7 @@ const Concierge: React.FC = () => {
                                     gates={gates}
                                     center={condoCenter}
                                     condoPerimeter={condoPerimeter}
+                                    selectedDeliveryId={selectedDeliveryId}
                                     onMarkerDragEnd={(id, lat, lng) => {
                                         const deliveryToUpdate = deliveries.find(d => d.id === id);
                                         if (deliveryToUpdate) {
@@ -262,6 +265,7 @@ const Concierge: React.FC = () => {
                                             <ActiveProcessListItem
                                                 key={d.id}
                                                 delivery={d}
+                                                onCardClick={(id) => setSelectedDeliveryId(prev => prev === id ? null : id)}
                                                 onRequestWhatsApp={() => { }}
                                                 onRequestPush={() => { }}
                                                 onPhoneCallClick={() => { }}
@@ -301,6 +305,7 @@ const Concierge: React.FC = () => {
                                                     <ActiveProcessListItem
                                                         key={d.id}
                                                         delivery={d}
+                                                        onCardClick={(id) => setSelectedDeliveryId(prev => prev === id ? null : id)}
                                                         onRequestWhatsApp={() => { }}
                                                         onRequestPush={() => { }}
                                                         onPhoneCallClick={() => { }}
@@ -327,6 +332,7 @@ const Concierge: React.FC = () => {
                                                     <ActiveProcessListItem
                                                         key={d.id}
                                                         delivery={d}
+                                                        onCardClick={(id) => setSelectedDeliveryId(prev => prev === id ? null : id)}
                                                         onRequestWhatsApp={() => { }}
                                                         onRequestPush={() => { }}
                                                         onPhoneCallClick={() => { }}

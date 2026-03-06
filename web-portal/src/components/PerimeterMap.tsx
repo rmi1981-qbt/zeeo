@@ -352,7 +352,7 @@ function InternalMap({ initialCenter, initialPolygon, initialGates, onPolygonCha
 
             {/* Toolbar */}
             {!readOnly && (
-                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl flex gap-1 z-50">
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur border border-slate-700 p-1.5 rounded-xl shadow-xl flex gap-1 z-50">
                     {!isDrawing ? (
                         <>
                             <button

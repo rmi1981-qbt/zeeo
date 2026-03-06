@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { type Condo } from '../services/condoService';
-import '../styles/SearchFilters.css';
+import { Search, MapPin, Building, RotateCcw } from 'lucide-react';
 
 interface SearchFiltersProps {
     condos: Condo[];
@@ -12,35 +12,18 @@ export function SearchFilters({ condos, onFilterChange }: SearchFiltersProps) {
     const [selectedUF, setSelectedUF] = useState<string>('');
     const [selectedCity, setSelectedCity] = useState<string>('');
 
-    // Extrair UFs únicas
     const states = [...new Set(condos.map(c => c.state).filter(Boolean))].sort();
-
-    // Extrair municípios da UF selecionada
     const cities = selectedUF
         ? [...new Set(condos.filter(c => c.state === selectedUF).map(c => c.city).filter(Boolean))].sort()
         : [];
 
-    // Filtrar condos quando qualquer filtro muda
     useEffect(() => {
         let filtered = condos;
-
-        // Filtro por nome (case-insensitive)
         if (searchName.trim()) {
-            filtered = filtered.filter(c =>
-                c.name.toLowerCase().includes(searchName.toLowerCase())
-            );
+            filtered = filtered.filter(c => c.name.toLowerCase().includes(searchName.toLowerCase()));
         }
-
-        // Filtro por UF
-        if (selectedUF) {
-            filtered = filtered.filter(c => c.state === selectedUF);
-        }
-
-        // Filtro por município
-        if (selectedCity) {
-            filtered = filtered.filter(c => c.city === selectedCity);
-        }
-
+        if (selectedUF) filtered = filtered.filter(c => c.state === selectedUF);
+        if (selectedCity) filtered = filtered.filter(c => c.city === selectedCity);
         onFilterChange(filtered);
     }, [searchName, selectedUF, selectedCity, condos, onFilterChange]);
 
@@ -51,59 +34,53 @@ export function SearchFilters({ condos, onFilterChange }: SearchFiltersProps) {
     }
 
     return (
-        <div className="search-filters">
-            <div className="filter-group">
-                <label htmlFor="search-name">Buscar por nome</label>
+        <div className="flex flex-col md:flex-row gap-4 w-full">
+            <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <input
-                    id="search-name"
                     type="text"
-                    placeholder="Digite o nome do condomínio..."
+                    placeholder="Buscar por nome..."
                     value={searchName}
                     onChange={(e) => setSearchName(e.target.value)}
-                    className="filter-input"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all text-sm"
                 />
             </div>
 
-            <div className="filter-group">
-                <label htmlFor="filter-uf">Estado (UF)</label>
+            <div className="relative flex-1 md:max-w-[180px]">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <select
-                    id="filter-uf"
                     value={selectedUF}
                     onChange={(e) => {
                         setSelectedUF(e.target.value);
-                        setSelectedCity(''); // Reset cidade ao mudar UF
+                        setSelectedCity('');
                     }}
-                    className="filter-select"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all text-sm"
                 >
-                    <option value="">Todos os Estados</option>
-                    {states.map(uf => (
-                        <option key={uf} value={uf}>{uf}</option>
-                    ))}
+                    <option value="">Estado (Todos)</option>
+                    {states.map(uf => <option key={uf} value={uf}>{uf}</option>)}
                 </select>
             </div>
 
-            <div className="filter-group">
-                <label htmlFor="filter-city">Município</label>
+            <div className="relative flex-1 md:max-w-[200px]">
+                <Building className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                 <select
-                    id="filter-city"
                     value={selectedCity}
                     onChange={(e) => setSelectedCity(e.target.value)}
                     disabled={!selectedUF}
-                    className="filter-select"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl py-2.5 pl-10 pr-4 text-white appearance-none focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <option value="">Todos os Municípios</option>
-                    {cities.map(city => (
-                        <option key={city} value={city}>{city}</option>
-                    ))}
+                    <option value="">Cidade (Todas)</option>
+                    {cities.map(city => <option key={city} value={city}>{city}</option>)}
                 </select>
             </div>
 
             <button
                 onClick={handleClear}
-                className="clear-filters-btn"
                 disabled={!searchName && !selectedUF && !selectedCity}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white rounded-xl text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
             >
-                🔄 Limpar Filtros
+                <RotateCcw size={16} />
+                Limpar
             </button>
         </div>
     );

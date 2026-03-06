@@ -92,6 +92,7 @@ export interface Delivery {
   exited_at?: string;
   request_channels?: ('whatsapp' | 'push')[];
   biometrics_verified?: boolean;
+  active_alerts?: any[]; // Allow backend alerts dynamically
 }
 
 export interface DeliveryEvent {

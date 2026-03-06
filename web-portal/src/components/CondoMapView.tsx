@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, Polygon, InfoWindow } from '@react-google-maps/api';
 import { useNavigate } from 'react-router-dom';
 import { type Condo } from '../services/condoService';
-import '../styles/CondoMapView.css';
+import { Loader2, Map as MapIcon, Edit2, MapPin } from 'lucide-react';
 
 interface CondoMapViewProps {
     condos: Condo[];
@@ -150,27 +150,27 @@ export function CondoMapView({ condos, onViewOnMap }: CondoMapViewProps) {
 
     if (!isLoaded) {
         return (
-            <div className="map-loading">
-                <div className="spinner"></div>
-                <p>Carregando mapa...</p>
+            <div className="flex flex-col items-center justify-center h-full w-full bg-slate-900/50 backdrop-blur-sm min-h-[400px] border border-slate-700/50 rounded-2xl">
+                <Loader2 className="animate-spin text-primary-500 mb-4" size={40} />
+                <p className="text-slate-400 font-medium font-sans">Carregando mapa maravilhoso...</p>
             </div>
         );
     }
 
     if (condos.length === 0) {
         return (
-            <div className="empty-state">
-                <div className="empty-icon">🗺️</div>
-                <h3>Nenhum condomínio para exibir</h3>
-                <p>Ajuste os filtros para ver condomínios no mapa</p>
+            <div className="flex flex-col items-center justify-center p-12 bg-slate-900/30 rounded-2xl border border-slate-700/50 h-full min-h-[400px]">
+                <MapIcon size={48} className="text-slate-600 mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2 font-display">Nenhum condomínio para exibir</h3>
+                <p className="text-slate-400 font-sans">Ajuste os filtros para ver condomínios no mapa</p>
             </div>
         );
     }
 
     return (
-        <div className="condo-map-view">
+        <div className="w-full h-full relative rounded-2xl overflow-hidden shadow-inner">
             <GoogleMap
-                mapContainerClassName="map-container"
+                mapContainerClassName="w-full h-full"
                 onLoad={setMap}
                 options={{
                     disableDefaultUI: false,
@@ -232,26 +232,27 @@ export function CondoMapView({ condos, onViewOnMap }: CondoMapViewProps) {
                             setPerimeterCoords([]);
                         }}
                     >
-                        <div className="info-window-content">
-                            <h3>{selectedCondo.name}</h3>
-                            <p className="info-location">
-                                📍 {selectedCondo.city}/{selectedCondo.state}
-                            </p>
+                        <div className="p-3 max-w-[280px] font-sans">
+                            <h3 className="text-lg font-bold text-slate-800 mb-2 border-b border-slate-200 pb-2">{selectedCondo.name}</h3>
+                            <div className="flex items-start gap-1.5 text-sm text-slate-600 mb-1">
+                                <MapPin size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                                <span>{selectedCondo.city}/{selectedCondo.state}</span>
+                            </div>
                             {selectedCondo.address && (
-                                <p className="info-address">{selectedCondo.address}</p>
+                                <p className="text-xs text-slate-500 pl-5 mb-4">{selectedCondo.address}</p>
                             )}
-                            <div className="info-actions">
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                                 <button
-                                    className="btn-info-edit"
+                                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 text-xs font-semibold transition-colors"
                                     onClick={() => handleEdit(selectedCondo)}
                                 >
-                                    ✏️ Editar
+                                    <Edit2 size={12} /> Editar
                                 </button>
                                 <button
-                                    className="btn-info-perimeter"
+                                    className="flex-1 flex items-center justify-center gap-1.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded border border-emerald-200 text-xs font-semibold transition-colors"
                                     onClick={() => handleViewPerimeter(selectedCondo)}
                                 >
-                                    🗺️ Ver Perímetro
+                                    <MapIcon size={12} /> Perímetro
                                 </button>
                             </div>
                         </div>

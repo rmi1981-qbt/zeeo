@@ -20,6 +20,7 @@ class CondoBase(BaseModel):
 
     condo_type: Optional[str] = 'horizontal'
     delivery_policy: Optional[str] = 'driver_waits'
+    alert_config: Optional[dict] = {}
 
 class CondoCreate(CondoBase):
     pass
@@ -37,7 +38,10 @@ class Condo(CondoBase):
 
 class UnitBase(BaseModel):
     condo_id: str
-    label: str # ex: "Apto 101", "Casa 5"
+    block: Optional[str] = None
+    number: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 class UnitCreate(UnitBase):
     pass
@@ -45,12 +49,17 @@ class UnitCreate(UnitBase):
 class Unit(UnitBase):
     id: str
     created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 class ResidentBase(BaseModel):
     unit_id: str
     name: str
-    phone_hash: Optional[str] = None
-    document_hash: Optional[str] = None
+    phone: Optional[str] = None
+    document: Optional[str] = None
+    can_authorize_deliveries: Optional[bool] = False
+    is_active: Optional[bool] = True
 
 class ResidentCreate(ResidentBase):
     pass
@@ -58,6 +67,45 @@ class ResidentCreate(ResidentBase):
 class Resident(ResidentBase):
     id: str
     created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ResidentEmployeeBase(BaseModel):
+    unit_id: str
+    name: str
+    document: Optional[str] = None
+    role: Optional[str] = None
+    can_authorize_deliveries: Optional[bool] = False
+    is_active: Optional[bool] = True
+
+class ResidentEmployeeCreate(ResidentEmployeeBase):
+    pass
+
+class ResidentEmployee(ResidentEmployeeBase):
+    id: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+class CondoEmployeeBase(BaseModel):
+    condo_id: str
+    name: str
+    document: Optional[str] = None
+    role: Optional[str] = None
+    access_level: Optional[str] = None
+    is_active: Optional[bool] = True
+
+class CondoEmployeeCreate(CondoEmployeeBase):
+    pass
+
+class CondoEmployee(CondoEmployeeBase):
+    id: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 # --- Location Tags Schemas ---
 
@@ -141,6 +189,7 @@ class Delivery(DeliveryBase):
     exited_at: Optional[datetime] = None
     qr_code_token: Optional[str] = None
     qr_code_expires_at: Optional[datetime] = None
+    active_alerts: Optional[List[dict]] = []
 
     class Config:
         from_attributes = True
