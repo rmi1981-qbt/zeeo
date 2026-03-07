@@ -8,6 +8,9 @@ import CondoSelection from './pages/dashboard/CondoSelection';
 import CondominiumSettings from './pages/dashboard/CondominiumSettings';
 import IntegrationsHub from './pages/dashboard/IntegrationsHub';
 import HubMonitoring from './pages/dashboard/HubMonitoring';
+import UnitManagement from './pages/dashboard/UnitManagement';
+import ResidentManagement from './pages/dashboard/ResidentManagement';
+import CondoEmployeeManagement from './pages/dashboard/CondoEmployeeManagement';
 import Concierge from './pages/Concierge';
 import AccessHistory from './pages/AccessHistory';
 import CondoRegistrationWizard from './components/CondoRegistrationWizard';
@@ -81,6 +84,9 @@ function App() {
                                 <Route path="/condominium-settings" element={<CondominiumSettings />} />
                                 <Route path="/integrations" element={<IntegrationsHub />} />
                                 <Route path="/hub-monitoring" element={<HubMonitoring />} />
+                                <Route path="/units" element={<UnitManagement />} />
+                                <Route path="/residents" element={<ResidentManagement />} />
+                                <Route path="/condo-employees" element={<CondoEmployeeManagement />} />
                             </Route>
                         </Route>
 

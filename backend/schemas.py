@@ -229,6 +229,12 @@ class WebhookPayload(BaseModel):
     actor_role: Optional[str] = 'resident'
     notes: Optional[str] = None
 
+class WhatsAppOCRWebhookPayload(BaseModel):
+    phone: str
+    image_url: str
+    condo_id: Optional[str] = None # Optionally restrict to a specific condo
+
+
 class QRCheckInPayload(BaseModel):
     condo_id: str
     qr_code_token: str

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Fingerprint, Zap, Store, Truck, ShoppingBag, X } from 'lucide-react';
+import { Fingerprint, Zap, Store, Truck, ShoppingBag, X, ScanLine, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 import { DriverAppSimulatorModal } from './Gatekeeper/DriverAppSimulatorModal';
@@ -12,6 +12,46 @@ export const SalesDemoInjector: React.FC<{ onDeliveryChange?: () => void }> = ({
     // Simulator Modal State
     const [simulatorProvider, setSimulatorProvider] = useState<'ifood' | 'mercadolivre' | 'ubereats' | null>(null);
     const [existingDeliveryId, setExistingDeliveryId] = useState<string | null>(null);
+    
+    // Webhook OCR Test State
+    const [isTestingOCR, setIsTestingOCR] = useState(false);
+    const [ocrResult, setOcrResult] = useState<string | null>(null);
+
+    const handleTestOCR = async () => {
+        if (!selectedCondo) return;
+
+        setIsTestingOCR(true);
+        setOcrResult(null);
+
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/hub/webhook/whatsapp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': 'ifood_sim_key_123'
+                },
+                body: JSON.stringify({
+                    phone: "5511999999999",
+                    image_url: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1",
+                    condo_id: selectedCondo
+                })
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                setOcrResult(`Sucesso! Motorista: ${data.extracted_data?.driver_name || 'N/A'}`);
+                if (onDeliveryChange) onDeliveryChange(); // Refresh concierge board
+            } else {
+                setOcrResult(`Erro: ${data.message || 'Falha ao processar'}`);
+            }
+        } catch (error) {
+             console.error(error);
+             setOcrResult("Erro de conexão com o Hub.");
+        } finally {
+            setIsTestingOCR(false);
+        }
+    };
 
     React.useEffect(() => {
         const handleOpenSimulator = (e: Event) => {
@@ -87,8 +127,28 @@ export const SalesDemoInjector: React.FC<{ onDeliveryChange?: () => void }> = ({
                                         <Truck size={18} className="text-slate-100" />
                                         <span className="font-semibold text-sm group-hover:text-white">Uber Fast-Track</span>
                                     </div>
-                                    <Fingerprint size={16} className="text-emerald-500" />
                                 </button>
+
+                                <div className="pt-2 border-t border-slate-700/50">
+                                    <div className="text-xs text-slate-400 mb-2">Webhooks (Testes Híbridos)</div>
+                                    <button
+                                        onClick={handleTestOCR}
+                                        disabled={isTestingOCR}
+                                        className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-emerald-600/20 to-emerald-500/20 border border-emerald-500/30 hover:bg-emerald-500/30 transition-colors group disabled:opacity-50"
+                                    >
+                                        <div className="flex items-center space-x-3 text-emerald-400">
+                                            {isTestingOCR ? <Loader2 size={18} className="animate-spin" /> : <ScanLine size={18} />}
+                                            <span className="font-semibold text-sm group-hover:text-emerald-300">
+                                                {isTestingOCR ? 'Processando Imagem...' : 'Simular WhatsApp OCR'}
+                                            </span>
+                                        </div>
+                                    </button>
+                                    {ocrResult && (
+                                        <div className="mt-2 text-xs font-medium text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-md border border-emerald-500/20">
+                                            {ocrResult}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="pt-2 border-t border-slate-700/50">
                                     <div className="text-xs text-slate-400 mb-2">Simular Resposta do Morador</div>

@@ -504,3 +504,106 @@ async def check_in_biometrics(
         err_msg = traceback.format_exc()
         print("BIOMETRIC CHECK-IN ERROR:", err_msg, flush=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/webhook/whatsapp")
+async def receive_whatsapp_ocr_webhook(
+    payload: schemas.WhatsAppOCRWebhookPayload,
+    provider_info: dict = Depends(verify_provider_api_key)
+):
+    """
+    Webhook to receive screenshots from WhatsApp.
+    Validates resident, calls Gemini for OCR, and injects 'pre_authorized' delivery.
+    """
+    try:
+        # 1. Look up the resident by phone
+        query = supabase.table('residents').select('id, name, unit_id, can_authorize_deliveries, units!inner(condo_id, label)')
+        if payload.condo_id:
+            query = query.eq('units.condo_id', payload.condo_id)
+        
+        # Adjust phone format matching depending on how it's stored. Assume exact match for MVP.
+        res = query.eq('phone', payload.phone).execute()
+        
+        if not res.data:
+            return {"status": "ignored", "message": "Phone number not recognized as a registered resident."}
+            
+        resident = res.data[0]
+        
+        if not resident.get('can_authorize_deliveries'):
+            return {"status": "rejected", "message": "Resident does not have authorization permissions."}
+            
+        # 2. Call Gemini Service
+        from services.gemini_service import process_delivery_screenshot
+        ocr_result = process_delivery_screenshot(payload.image_url)
+        
+        if not ocr_result:
+             return {"status": "failed", "message": "Failed to extract delivery information from the image."}
+             
+        if not ocr_result.get('is_delivery_screen'):
+             return {"status": "ignored", "message": "Image does not appear to be a delivery screen."}
+             
+        # 3. Inject pre_authorized Delivery
+        raw_platform = str(ocr_result.get('app') or 'other').lower()
+        if raw_platform not in ('ifood', 'ubereats', 'mercadolivre', 'rappi', 'mock'):
+             raw_platform = 'other'
+
+        delivery_data = {
+            'condo_id': resident['units']['condo_id'],
+            'unit': resident['units']['label'],
+            'status': 'pre_authorized',
+            'platform': raw_platform,
+            'driver_name': ocr_result.get('driver_name') or 'Unknown Driver',
+            'driver_plate': ocr_result.get('plate'),
+            'authorized_method': 'whatsapp',
+            'authorized_at': datetime.utcnow().isoformat(),
+            'created_at': datetime.utcnow().isoformat(),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
+        ins_resp = supabase.table('deliveries').insert(delivery_data).execute()
+        if not ins_resp.data:
+             raise HTTPException(status_code=500, detail="Failed to inject delivery into database.")
+             
+        created_delivery = ins_resp.data[0]
+        
+        # 4. Generate QR Token just in case they use it
+        from utils.delivery_helpers import generate_qr_token
+        from datetime import timedelta
+        qr_token = generate_qr_token()
+        qr_expiry = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+        
+        supabase.table('deliveries').update({
+             'qr_code_token': qr_token,
+             'qr_code_expires_at': qr_expiry
+        }).eq('id', created_delivery['id']).execute()
+        
+        # 5. Log event
+        from utils.delivery_helpers import log_delivery_event
+        log_delivery_event(
+            delivery_id=created_delivery['id'],
+            condo_id=created_delivery['condo_id'],
+            event_type='pre_authorized',
+            metadata={
+                'trigger': 'whatsapp_ocr',
+                'resident_id': resident['id'],
+                'resident_name': resident['name'],
+                'ocr_raw_result': ocr_result
+            }
+        )
+        
+        # Dispatch Realtime update
+        from webhooks import dispatch_webhook
+        dispatch_webhook(created_delivery['condo_id'], 'delivery.created', created_delivery)
+        
+        return {
+            "status": "success",
+            "message": "Delivery pre-authorized successfully via WhatsApp OCR.",
+            "delivery": created_delivery,
+            "extracted_data": ocr_result
+        }
+        
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print("WHATSAPP WEBHOOK ERROR:", err_msg, flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
+

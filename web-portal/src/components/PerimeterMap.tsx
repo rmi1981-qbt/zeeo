@@ -4,7 +4,7 @@ import { PenTool, Eraser, CheckCircle, Info, Undo, DoorOpen, Plus } from 'lucide
 import PlaceSearchBox from './PlaceSearchBox';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
-const MAP_ID = 'PERIMETER_EDITOR_MAP';
+const MAP_ID = 'DEMO_MAP_ID';
 
 import { Gate } from '../services/condoService';
 

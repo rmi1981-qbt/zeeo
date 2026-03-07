@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 const HubMonitoring: React.FC = () => {
     const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('today');
-
     // Mock API Status
     const apiStatus = [
         { name: 'Gateway Recebimento', status: 'operational', uptime: '99.9%', latency: '45ms' },

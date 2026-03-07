@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Building2, SlidersHorizontal, Blocks, Activity } from 'lucide-react';
+import { Settings, Building2, SlidersHorizontal, Blocks, Activity, Home, Users, Shield } from 'lucide-react';
 
 type MenuItem = {
     label: string;
@@ -49,6 +49,24 @@ const SettingsDropdown: React.FC<SettingsDropdownProps> = ({ selectedCondo, isPl
             label: 'Monitoramento do Hub',
             path: '/hub-monitoring',
             icon: <Activity size={16} />,
+            visible: !!selectedCondo,
+        },
+        {
+            label: 'Gestão de Unidades',
+            path: '/units',
+            icon: <Home size={16} />,
+            visible: !!selectedCondo,
+        },
+        {
+            label: 'Gestão de Moradores',
+            path: '/residents',
+            icon: <Users size={16} />,
+            visible: !!selectedCondo,
+        },
+        {
+            label: 'Equipe do Condomínio',
+            path: '/condo-employees',
+            icon: <Shield size={16} />,
             visible: !!selectedCondo,
         },
     ];
