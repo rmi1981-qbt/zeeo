@@ -2,30 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useAdvancedMarkerRef, useMap } from '@vis.gl/react-google-maps';
 import { Delivery } from '@zeeo/shared';
 import { motion } from 'framer-motion';
-import { Bike, Truck, Car, MapPin, DoorOpen } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import { getProviderColors } from '../utils/providerIcons';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const MAP_ID = 'DEMO_MAP_ID';
-
-const getProviderIcon = (provider: string = '') => {
-    switch (provider.toLowerCase()) {
-        case 'ifood': return <Bike size={16} className="text-white" />;
-        case 'mercadolivre': return <Truck size={16} className="text-slate-900" />;
-        case 'uber':
-        case 'ubereats': return <Car size={16} className="text-white" />;
-        default: return <MapPin size={16} className="text-white" />;
-    }
-};
-
-const getProviderColors = (provider: string = '') => {
-    switch (provider.toLowerCase()) {
-        case 'ifood': return { bg: 'bg-red-600', shadow: 'shadow-red-600/50' };
-        case 'mercadolivre': return { bg: 'bg-yellow-400', shadow: 'shadow-yellow-400/50' };
-        case 'uber':
-        case 'ubereats': return { bg: 'bg-black', shadow: 'shadow-black/50' };
-        default: return { bg: 'bg-slate-600', shadow: 'shadow-slate-600/50' };
-    }
-};
 
 const PerimeterPolygon = ({ perimeter }: { perimeter: { lat: number, lng: number }[] }) => {
     const map = useMap();
@@ -132,7 +113,7 @@ const DeliveryMarker = ({ delivery, onDragEnd, onMarkerClick, isSelected }: { de
                 <div
                     className={`p-2 rounded-full border-2 border-white shadow-lg ${providerStyle.bg} ${providerStyle.shadow} flex items-center justify-center`}
                 >
-                    {getProviderIcon(delivery.provider)}
+                    <MapPin size={16} className={providerStyle.text} />
                 </div>
             </AdvancedMarker>
 
@@ -243,10 +224,9 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                             position={{ lat: gate.lat, lng: gate.lng }}
                             title={gate.name}
                         >
-                            <div className={`p-1.5 rounded-lg border-2 border-white shadow-lg flex items-center justify-center group relative
-                                ${gate.is_main ? 'bg-emerald-600 shadow-emerald-500/50' : 'bg-slate-700 shadow-slate-900/50'}`}
-                            >
-                                <DoorOpen size={16} className="text-white" />
+                            <div className={`relative flex items-center justify-center w-8 h-8 rounded-full shadow-lg ${gate.is_main ? 'bg-emerald-600 shadow-emerald-500/50' : 'bg-slate-700 shadow-slate-900/50'} ring-4 ring-white/10`}>
+                                <MapPin size={20} className="text-white" />
+                                {gate.is_main && <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900" />}
                                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                                     {gate.name}
                                 </div>

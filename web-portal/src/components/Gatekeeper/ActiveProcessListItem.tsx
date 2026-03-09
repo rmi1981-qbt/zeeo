@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Phone, MessageCircle, Bell, Loader2, AlertTriangle, MapPinOff, Navigation, ScanFace, ScanLine, ShieldCheck, Clock } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { getProviderColors } from '../../utils/providerIcons';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -21,6 +22,7 @@ interface ActiveProcessListItemProps {
     onVerifyBiometrics?: (id: string) => void;
     onLiberateEntry?: (id: string) => void;
     onCardClick?: (id: string) => void;
+    compact?: boolean;
 }
 
 export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
@@ -34,7 +36,8 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
     onQRScanClick,
     onVerifyBiometrics,
     onLiberateEntry,
-    onCardClick
+    onCardClick,
+    compact = false
 }) => {
     const isPending = (delivery.request_channels && delivery.request_channels.length > 0 && !delivery.authorized_by && delivery.status !== 'pre_authorized');
     const isConflict = delivery.status === 'conflicting';
@@ -93,26 +96,29 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             )}
         >
             {/* Header: Driver & Unit */}
-            <div className="flex justify-between items-start mb-3">
+            <div className={cn("flex justify-between mb-3", compact ? "items-center" : "items-start")}>
                 <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                        {delivery.driver_snapshot.photoUrl ? (
-                            <img src={delivery.driver_snapshot.photoUrl} className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                            <span className="font-bold text-slate-500">{delivery.driver_snapshot.name.charAt(0)}</span>
-                        )}
+                    <div className={cn("rounded-full bg-slate-800 flex items-center justify-center shrink-0 border border-slate-700/50 overflow-hidden", compact ? "w-8 h-8" : "w-10 h-10")}>
+                        {(() => {
+                            const mockFiles = ['/mock-drivers/driver1_1773067298883.png', '/mock-drivers/driver2_1773067318694.png'];
+                            const hash = delivery.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                            const displayPhoto = delivery.driver_snapshot.photoUrl || mockFiles[hash % mockFiles.length];
+                            return <img src={displayPhoto} className="w-full h-full object-cover" alt={delivery.driver_snapshot.name} />;
+                        })()}
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-100">{delivery.driver_snapshot.name}</h3>
-                        <div className="flex items-center space-x-1 text-xs text-slate-400">
-                            <span>{delivery.provider}</span>
-                            <span>•</span>
-                            <span>{delivery.driver_snapshot.plate || 'Sem Placa'}</span>
+                        <h3 className={cn("font-bold text-slate-100", compact && "text-sm leading-tight")}>{delivery.driver_snapshot.name}</h3>
+                        <div className={cn("flex items-center space-x-1 mt-0.5", compact ? "text-[10px]" : "text-xs")}>
+                            <span className={cn("capitalize px-1.5 py-0.5 rounded font-bold", getProviderColors(delivery.provider).bg, getProviderColors(delivery.provider).text)}>
+                                {delivery.provider}
+                            </span>
+                            <span className="text-slate-400">•</span>
+                            <span className="text-slate-400">{delivery.driver_snapshot.plate || 'Sem Placa'}</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-1.5">
+                <div className={cn("flex flex-col gap-1.5", compact ? "items-end justify-center" : "items-end")}>
                     {/* Always show the Target Unit */}
                     <div className="flex items-center space-x-1 bg-slate-900/50 px-2 py-1 rounded text-primary-400 font-bold border border-primary-500/20">
                         <Navigation size={12} />
@@ -120,7 +126,7 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
                     </div>
                     
                     {/* If no location, show the Open Driver App button clearly */}
-                    {!delivery.location && (
+                    {(!delivery.location && !compact) && (
                         <button 
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -162,7 +168,7 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
             </div>
 
             {/* Double-Check & Actions for Entradas */}
-            {isEntrada && (
+            {(isEntrada && !compact) && (
                 <div className="mt-3 pt-3 border-t border-slate-700/50 flex flex-col gap-3">
                     {/* Check 1: Morador */}
                     <div className={cn("p-3 rounded-lg border transition-all", residentApproved ? "bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.05)]" : "bg-slate-800/50 border-slate-700")}>
@@ -284,9 +290,9 @@ export const ActiveProcessListItem: React.FC<ActiveProcessListItemProps> = ({
 
             {/* Exit Control Action for Inside Deliveries */}
             {(delivery.status === 'inside' && !isExited && onExitManual) && (
-                <div className="mt-3 pt-3 border-t border-sky-500/30 flex justify-between items-center">
-                    <span className="text-[10px] text-sky-500/70">Veículo no Condomínio</span>
-                    <button onClick={() => onExitManual(delivery.id)} className="px-4 py-1.5 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white text-slate-300 text-xs font-bold transition-colors">
+                <div className="mt-2 pt-2 border-t border-sky-500/30 flex justify-between items-center">
+                    <span className="text-[10px] text-sky-500/70">{compact ? 'No Interior' : 'Veículo no Condomínio'}</span>
+                    <button onClick={(e) => { e.stopPropagation(); onExitManual(delivery.id); }} className={cn("rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 hover:text-white text-slate-300 font-bold transition-colors", compact ? "px-3 py-1 text-[10px]" : "px-4 py-1.5 text-xs")}>
                         Liberar Saída
                     </button>
                 </div>

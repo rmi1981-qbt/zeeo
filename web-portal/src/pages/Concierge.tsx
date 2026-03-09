@@ -145,12 +145,13 @@ const Concierge: React.FC = () => {
             <div className="flex-1 flex flex-col h-full relative z-10">
 
                 {/* BOARD CONTENT */}
-                <main className="flex-1 p-4 lg:p-6 overflow-hidden">
-                    <div className="flex h-full gap-4 lg:gap-6 max-w-[1800px] mx-auto">
+                <main className="flex-1 p-4 lg:p-6 overflow-hidden flex flex-col gap-4 lg:gap-6">
+                    {/* TOP ROW: Entradas, Map, Saídas / Histórico */}
+                    <div className="flex-[2] flex gap-4 lg:gap-6 max-w-[1800px] mx-auto w-full min-h-[400px]">
 
                         {/* COL 1: ENTRADAS (25%) */}
-                        <div className="w-1/4 flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden">
-                            <div className="p-4 border-b border-slate-800/50 flex flex-col gap-3 bg-slate-900/80 backdrop-blur-md">
+                        <div className="w-1/4 flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden min-w-[300px]">
+                            <div className="p-4 border-b border-slate-800/50 flex flex-col gap-3 bg-slate-900/80 backdrop-blur-md shrink-0">
                                 <div className="flex justify-between items-center">
                                     <h2 className="text-base lg:text-lg font-bold text-slate-100 flex items-center space-x-2">
                                         <div className="w-2.5 h-2.5 bg-yellow-400 rounded-sm rotate-45 animate-pulse" />
@@ -176,7 +177,7 @@ const Concierge: React.FC = () => {
                                     {[
                                         { id: 'all', label: 'Todos' },
                                         { id: 'ifood', label: 'iFood' },
-                                        { id: 'mercadolivre', label: 'Mercado Livre' },
+                                        { id: 'mercadolivre', label: ' Mercado Livre' },
                                         { id: 'uber', label: 'Uber' }
                                     ].map(f => (
                                         <button
@@ -225,68 +226,33 @@ const Concierge: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* COL 2: CENTER (50%) - MAP + INSIDE */}
-                        <div className="w-2/4 flex flex-col h-full gap-4 lg:gap-6">
-                            {/* MAP (Top 2/3) */}
-                            <div className="flex-[2] flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm relative overflow-hidden group min-h-[300px]">
-                                <LiveMap
-                                    deliveries={deliveries}
-                                    gates={gates}
-                                    center={condoCenter}
-                                    condoPerimeter={condoPerimeter}
-                                    selectedDeliveryId={selectedDeliveryId}
-                                    onMarkerDragEnd={(id, lat, lng) => {
-                                        const deliveryToUpdate = deliveries.find(d => d.id === id);
-                                        if (deliveryToUpdate) {
-                                            updateStatus(id, {
-                                                status: deliveryToUpdate.status,
-                                                driver_lat: lat,
-                                                driver_lng: lng
-                                            });
-                                        }
-                                    }}
-                                    onMarkerClick={(id, provider) => {
-                                        window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: id, provider } }));
-                                    }}
-                                />
-                            </div>
-
-                            {/* INSIDE QUEUE (Bottom 1/3) */}
-                            <div className="flex-[1] flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden min-h-[250px]">
-                                <div className="p-3 lg:p-4 border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-md">
-                                    <h3 className="text-sm font-bold text-slate-100 flex items-center justify-between uppercase tracking-wider">
-                                        <span>No Condomínio</span>
-                                        <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px]">{insideQueue.length}</span>
-                                    </h3>
-                                </div>
-                                <div className="p-4 overflow-y-auto space-y-3 flex-1 scrollbar-hide bg-slate-950/20">
-                                    <AnimatePresence mode="popLayout">
-                                        {insideQueue.length > 0 ? insideQueue.map(d => (
-                                            <ActiveProcessListItem
-                                                key={d.id}
-                                                delivery={d}
-                                                onCardClick={(id) => setSelectedDeliveryId(prev => prev === id ? null : id)}
-                                                onRequestWhatsApp={() => { }}
-                                                onRequestPush={() => { }}
-                                                onPhoneCallClick={() => { }}
-                                                onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
-                                                onRecover={() => { }}
-                                                onLiberateEntry={() => { }}
-                                                onVerifyBiometrics={() => { }}
-                                            />
-                                        )) : (
-                                            <div className="text-center h-full flex flex-col items-center justify-center text-slate-600">
-                                                <p className="text-xs">Nenhum veículo no condomínio.</p>
-                                            </div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </div>
+                        {/* COL 2: CENTER MAP (50%) */}
+                        <div className="w-2/4 flex flex-[2] bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm relative overflow-hidden group">
+                            <LiveMap
+                                deliveries={deliveries}
+                                gates={gates}
+                                center={condoCenter}
+                                condoPerimeter={condoPerimeter}
+                                selectedDeliveryId={selectedDeliveryId}
+                                onMarkerDragEnd={(id, lat, lng) => {
+                                    const deliveryToUpdate = deliveries.find(d => d.id === id);
+                                    if (deliveryToUpdate) {
+                                        updateStatus(id, {
+                                            status: deliveryToUpdate.status,
+                                            driver_lat: lat,
+                                            driver_lng: lng
+                                        });
+                                    }
+                                }}
+                                onMarkerClick={(id, provider) => {
+                                    window.dispatchEvent(new CustomEvent('open-simulator', { detail: { deliveryId: id, provider } }));
+                                }}
+                            />
                         </div>
 
                         {/* COL 3: SAIDAS & HISTÓRICO (25%) */}
-                        <div className="w-1/4 flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden">
-                            <div className="p-4 border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-md">
+                        <div className="w-1/4 flex flex-col h-full bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden min-w-[300px]">
+                            <div className="p-4 border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-md shrink-0">
                                 <h2 className="text-base lg:text-lg font-bold text-slate-100 flex items-center space-x-2">
                                     <span>Saídas</span>
                                 </h2>
@@ -355,7 +321,44 @@ const Concierge: React.FC = () => {
                                 </AnimatePresence>
                             </div>
                         </div>
+                    </div>
 
+                    {/* BOTTOM ROW: INSIDE QUEUE (Full Width) */}
+                    <div className="flex-[1] flex flex-col bg-slate-900/50 rounded-2xl border border-slate-800/50 backdrop-blur-sm overflow-hidden min-h-[220px] max-w-[1800px] w-full mx-auto">
+                        <div className="p-3 lg:p-4 border-b border-slate-800/50 bg-slate-900/80 backdrop-blur-md shrink-0">
+                            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 uppercase tracking-wider">
+                                <div className="w-2.5 h-2.5 bg-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+                                <span>No Condomínio</span>
+                                <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px] ml-2">{insideQueue.length}</span>
+                            </h3>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-1 scrollbar-hide bg-slate-950/20">
+                            <AnimatePresence mode="popLayout">
+                                {insideQueue.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                                        {insideQueue.map(d => (
+                                            <ActiveProcessListItem
+                                                key={d.id}
+                                                delivery={d}
+                                                compact={true}
+                                                onCardClick={(id) => setSelectedDeliveryId(prev => prev === id ? null : id)}
+                                                onRequestWhatsApp={() => { }}
+                                                onRequestPush={() => { }}
+                                                onPhoneCallClick={() => { }}
+                                                onExitManual={(id) => updateStatus(id, { status: 'exited', actor_role: 'concierge' })}
+                                                onRecover={() => { }}
+                                                onLiberateEntry={() => { }}
+                                                onVerifyBiometrics={() => { }}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="text-center h-full flex flex-col items-center justify-center text-slate-600">
+                                        <p className="text-sm">Nenhum veículo no interior do condomínio neste momento.</p>
+                                    </div>
+                                )}
+                            </AnimatePresence>
+                        </div>
                     </div>
                 </main>
             </div>
