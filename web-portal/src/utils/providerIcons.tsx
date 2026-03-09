@@ -1,3 +1,16 @@
+import { Bike, Truck, Car, MapPin } from 'lucide-react';
+
+export const getProviderIcon = (provider: string = '', size: number = 16, className: string = '') => {
+    const normalizedProvider = provider.toLowerCase().replace(/\s+/g, '');
+    switch (normalizedProvider) {
+        case 'ifood': return <Bike size={size} className={className || "text-red-500"} />;
+        case 'mercadolivre': return <Truck size={size} className={className || "text-yellow-500"} />;
+        case 'uber':
+        case 'ubereats': return <Car size={size} className={className || "text-slate-900"} />;
+        default: return <MapPin size={size} className={className || "text-slate-500"} />;
+    }
+};
+
 export const getProviderColors = (provider: string = '') => {
     const normalizedProvider = provider.toLowerCase().replace(/\s+/g, '');
     switch (normalizedProvider) {

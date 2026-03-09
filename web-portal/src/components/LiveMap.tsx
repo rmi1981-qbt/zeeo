@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useAdvancedMarkerRef, useMap } from '@vis.gl/react-google-maps';
 import { Delivery } from '@zeeo/shared';
 import { motion } from 'framer-motion';
-import { MapPin } from 'lucide-react';
-import { getProviderColors } from '../utils/providerIcons';
+import { DoorOpen } from 'lucide-react';
+import { getProviderColors, getProviderIcon } from '../utils/providerIcons';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 const MAP_ID = 'DEMO_MAP_ID';
@@ -111,9 +111,9 @@ const DeliveryMarker = ({ delivery, onDragEnd, onMarkerClick, isSelected }: { de
                 }}
             >
                 <div
-                    className={`p-2 rounded-full border-2 border-white shadow-lg ${providerStyle.bg} ${providerStyle.shadow} flex items-center justify-center`}
+                    className={`p-2 rounded-full border-2 border-white shadow-lg bg-white ${providerStyle.shadow} flex items-center justify-center`}
                 >
-                    <MapPin size={16} className={providerStyle.text} />
+                    {getProviderIcon(delivery.provider, 16)}
                 </div>
             </AdvancedMarker>
 
@@ -225,7 +225,7 @@ const LiveMap: React.FC<LiveMapProps> = ({ deliveries, gates = [], center = { la
                             title={gate.name}
                         >
                             <div className={`relative flex items-center justify-center w-8 h-8 rounded-full shadow-lg ${gate.is_main ? 'bg-emerald-600 shadow-emerald-500/50' : 'bg-slate-700 shadow-slate-900/50'} ring-4 ring-white/10`}>
-                                <MapPin size={20} className="text-white" />
+                                <DoorOpen size={16} className="text-white" />
                                 {gate.is_main && <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900" />}
                                 <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                                     {gate.name}
